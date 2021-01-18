@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "CKMQzn+LMLphW+T2bB++y0iplYp0EwE28N1zWROjxfsR4epLpe8llbgReMytNT4TcxNPvYsB6GQ4wIvvNSfJbw==",
+  "success": true,
+  "projectFilePath": "C:\\Users\\Manuel\\source\\repos\\ReforgedNet\\ReforgedNet\\ReforgedNet.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Manuel\\.nuget\\packages\\newtonsoft.json\\12.0.3\\newtonsoft.json.12.0.3.nupkg.sha512"
+  ],
+  "logs": []
+}
