@@ -4,5 +4,6 @@ using System.Text;
 
 namespace ReforgedNet
 {
-    public delegate void ResponseDelegate(RBasePacket message);
+    public delegate void ResponseDelegate(RBasePacket packet);
+    public delegate void GenericResponseDelegate<T>(T packet);
 }
