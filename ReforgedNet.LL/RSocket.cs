@@ -19,7 +19,7 @@ namespace ReforgedNet.LL
         private ConcurrentBag<(RNetMessage, DateTime)> _sentUnansweredMsgQueue = new ConcurrentBag<(RNetMessage, DateTime)>();
         private ConcurrentQueue<RNetMessage> _incomingMsgQueue = new ConcurrentQueue<RNetMessage>();
 
-        private ICollection<ReceiveDelegate> _receiveDelegates;
+        private IList<ReceiveDelegateDefinition> _receiveDelegates;
 
         private readonly Socket _socket;
         private readonly IPacketSerializer _serializer;
@@ -32,7 +32,7 @@ namespace ReforgedNet.LL
             _socket = socket;
             _serializer = serializer;
 
-            _receiveDelegates = new List<ReceiveDelegate>();
+            _receiveDelegates = new List<ReceiveDelegateDefinition>();
 
             _recvTask = Task.Factory.StartNew(() => ReceivingTask(cancellationToken), cancellationToken);
             _recvTask.ConfigureAwait(false);
@@ -48,18 +48,49 @@ namespace ReforgedNet.LL
             => _outgoingMsgQueue.Enqueue(message); // TODO: Add validation?
 
         /// <summary>
-        /// Registers receiver.
+        /// Registers receiver with message id.
         /// </summary>
+        /// <param name="messageId"></param>
         /// <param name="delegate"></param>
-        public void RegisterReceiver(ReceiveDelegate @delegate)
-            => _receiveDelegates.Add(@delegate);
+        public void RegisterReceiver(int messageId, ReceiveDelegate @delegate)
+        {
+            _receiveDelegates.Add(
+                new ReceiveDelegateDefinition(messageId, @delegate)
+            );
+        }
+
+        /// <summary>
+        /// Registers receiver with method name.
+        /// </summary>
+        /// <param name="method"></param>
+        /// <param name="delegate"></param>
+        public void RegisterReceiver(string method, ReceiveDelegate @delegate)
+        {
+            _receiveDelegates.Add(
+                new ReceiveDelegateDefinition(method, @delegate)
+            );
+        }
 
         /// <summary>
         /// Dispatches incoming message queue into callee thread.
         /// </summary>
         public void Dispatch()
         {
-
+            if (!_incomingMsgQueue.IsEmpty)
+            {
+                foreach (var netMsg in _incomingMsgQueue)
+                {
+                    for (int i = 0; i < _receiveDelegates.Count; ++i)
+                    {
+                        if (_receiveDelegates[i].MessageId != null && _receiveDelegates[i].MessageId == netMsg.MessageId
+                            || _receiveDelegates[i].Method != null && _receiveDelegates[i].Method == netMsg.Method)
+                        {
+                            _receiveDelegates[i].ReceiveDelegate.Invoke(netMsg);
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
         private async Task SendingTask(CancellationToken cancellationToken)
