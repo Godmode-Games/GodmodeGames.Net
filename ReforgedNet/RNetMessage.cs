@@ -25,7 +25,7 @@ namespace ReforgedNet
         public RNetMessageParameter[] Params = new RNetMessageParameter[0];
         public int? TransactionId;
         public EndPoint RemoteEndPoint;
-        public RQoSType QoSType;
+        public RQoSType QoSType = RQoSType.Unrealiable;
 
         public RNetMessage(string method, EndPoint remoteEP)
         {

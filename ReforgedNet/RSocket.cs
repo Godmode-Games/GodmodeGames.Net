@@ -10,29 +10,26 @@ using System.Threading.Tasks;
 
 namespace ReforgedNet
 {
-    public class RNetworkMsg
-    {
-        public readonly byte[] Data;
-    }
-
     public abstract class RSocket
     {
         public const int SENDING_IDLE_DELAY = 1000 / 50;
 
-        private ConcurrentQueue<RNetMessage> _outgoingMsgQueue;
-        private ConcurrentQueue<RNetMessage> _incomingMsgQueue;
+        private ConcurrentQueue<RNetMessage> _outgoingMsgQueue = new ConcurrentQueue<RNetMessage>();
+        private ConcurrentQueue<RNetMessage> _incomingMsgQueue = new ConcurrentQueue<RNetMessage>();
 
         private ICollection<ReceiveDelegate> _receiveDelegates;
 
-        private IPacketSerializer _serializer;
-
-        private Socket _socket;
+        private readonly Socket _socket;
+        private readonly IPacketSerializer _serializer;
 
         private Task _recvTask;
         private Task _sendTask;
 
-        public RSocket(CancellationToken cancellationToken)
+        public RSocket(Socket socket, IPacketSerializer serializer, CancellationToken cancellationToken)
         {
+            _socket = socket;
+            _serializer = serializer;
+
             _receiveDelegates = new List<ReceiveDelegate>();
 
             _recvTask = Task.Factory.StartNew(() => ReceivingTask(cancellationToken), cancellationToken);
