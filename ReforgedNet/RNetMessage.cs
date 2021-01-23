@@ -4,7 +4,7 @@ using System.Net;
 using System.Text;
 
 #nullable enable
-namespace ReforgedNet
+namespace ReforgedNet.LL
 {
     public class RNetMessageParameter
     {

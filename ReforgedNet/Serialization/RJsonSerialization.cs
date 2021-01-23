@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace ReforgedNet.Serialization
+namespace ReforgedNet.LL.Serialization
 {
     public class RJsonSerialization : IPacketSerializer
     {
@@ -20,6 +20,11 @@ namespace ReforgedNet.Serialization
         public RNetMessage Deserialize(byte[] data)
         {
             return JsonConvert.DeserializeObject<RNetMessage>(ASCIIEncoding.UTF8.GetString(data));
+        }
+
+        public bool IsValidReliableMessageACK(byte[] data)
+        {
+            throw new NotImplementedException();
         }
     }
 }

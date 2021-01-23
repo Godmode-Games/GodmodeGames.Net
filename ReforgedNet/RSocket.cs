@@ -1,4 +1,4 @@
-﻿using ReforgedNet.Serialization;
+﻿using ReforgedNet.LL.Serialization;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -8,13 +8,15 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace ReforgedNet
+namespace ReforgedNet.LL
 {
-    public abstract class RSocket
+    public class RSocket
     {
         public const int SENDING_IDLE_DELAY = 1000 / 50;
+        public const int SENT_RELIABLE_MESSAGE_RETRY_DELAY = 1000 / 10;
 
         private ConcurrentQueue<RNetMessage> _outgoingMsgQueue = new ConcurrentQueue<RNetMessage>();
+        private ConcurrentBag<(RNetMessage, DateTime)> _sentUnansweredMsgQueue = new ConcurrentBag<(RNetMessage, DateTime)>();
         private ConcurrentQueue<RNetMessage> _incomingMsgQueue = new ConcurrentQueue<RNetMessage>();
 
         private ICollection<ReceiveDelegate> _receiveDelegates;
@@ -45,9 +47,16 @@ namespace ReforgedNet
         public void Send(RNetMessage message)
             => _outgoingMsgQueue.Enqueue(message); // TODO: Add validation?
 
+        /// <summary>
+        /// Registers receiver.
+        /// </summary>
+        /// <param name="delegate"></param>
         public void RegisterReceiver(ReceiveDelegate @delegate)
             => _receiveDelegates.Add(@delegate);
 
+        /// <summary>
+        /// Dispatches incoming message queue into callee thread.
+        /// </summary>
         public void Dispatch()
         {
 
@@ -64,10 +73,28 @@ namespace ReforgedNet
                         byte[] data = _serializer.Serialize(netMsg);
 
                         int numOfSentBytes = await _socket.SendToAsync(data, SocketFlags.None, netMsg.RemoteEndPoint);
+
+                        if (netMsg.QoSType == RQoSType.Realiable)
+                        {
+                            _sentUnansweredMsgQueue.Add((netMsg, DateTime.Now.AddMilliseconds(SENT_RELIABLE_MESSAGE_RETRY_DELAY)));
+                        }
                     }
                 }
                 else
                 {
+                    // Procceed unanswered reliable message inside the queue.
+                    if (!_sentUnansweredMsgQueue.IsEmpty)
+                    {
+                        foreach (var netMsg in _sentUnansweredMsgQueue)
+                        {
+                            if (netMsg.Item2 > DateTime.Now)
+                            {
+                                byte[] data = _serializer.Serialize(netMsg.Item1);
+                                int numOfSentBytes = await _socket.SendToAsync(data, SocketFlags.None, netMsg.Item1.RemoteEndPoint);
+                            }
+                        }
+                    }
+
                     // Nothing to do, take a short break.
                     await Task.Delay(SENDING_IDLE_DELAY);
                 }
@@ -98,7 +125,11 @@ namespace ReforgedNet
                 }
                 else
                 {
-                    // Log Exception
+#if DEBUG
+                    throw new IndexOutOfRangeException($"Received message with a length of 0 or buffer length unequal num of received bytes. NumberOfReceivedBytes {numOfRecvBytes} - Buffer length: {e.Buffer.Length}");
+#elif RELEASE
+                    // Log message
+#endif
                 }
 
             };

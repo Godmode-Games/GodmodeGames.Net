@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace ReforgedNet
+namespace ReforgedNet.LL
 {
     public enum RQoSType
     {
