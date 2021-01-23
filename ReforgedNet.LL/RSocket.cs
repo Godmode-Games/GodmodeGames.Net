@@ -72,6 +72,43 @@ namespace ReforgedNet.LL
         }
 
         /// <summary>
+        /// This function is not threadsafe and should only gets called from dispatcher thread.
+        /// </summary>
+        /// <param name="messageId"></param>
+        public void UnregisterReceiver(int messageId)
+        {
+            int index = 0;
+            for (index = 0; index < _receiveDelegates.Count; ++index)
+            {
+                if (_receiveDelegates[index].MessageId == messageId)
+                {
+                    break;
+                }
+            }
+
+            _receiveDelegates.RemoveAt(index);
+        }
+
+        /// <summary>
+        /// This function is not threadsafe and should only gets called from dispatcher thread.
+        /// </summary>
+        /// <param name="method"></param>
+        public void UnregisterReceiver(string method)
+        {
+            int index = 0;
+            for (index = 0; index < _receiveDelegates.Count; ++index)
+            {
+                if (_receiveDelegates[index].Method == method)
+                {
+                    break;
+                }
+            }
+
+            _receiveDelegates.RemoveAt(index);
+        }
+
+
+        /// <summary>
         /// Dispatches incoming message queue into callee thread.
         /// </summary>
         public void Dispatch()
