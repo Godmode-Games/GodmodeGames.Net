@@ -4,14 +4,21 @@ using System.Text;
 
 namespace ReforgedNet
 {
-    public static class RBasePacketExt
+    public static class RNetMessageExt
     {
-        public static T CreateAnswerFromRequest<T>(this RBasePacket request)
-            where T : RBasePacket, new()
+        public static RNetMessage CreateResponseToRequest(this RNetMessage request, string method)
         {
-            return new T()
+            return new RNetMessage(method, request.RemoteEndPoint)
             {
-                TransactionId = request.TransactionId
+                TransactionId = RTransactionGenerator.GenerateId()
+            };
+        }
+
+        public static RNetMessage CreateResponseToRequest(this RNetMessage request, int messageId)
+        {
+            return new RNetMessage(messageId, request.RemoteEndPoint)
+            {
+                TransactionId = RTransactionGenerator.GenerateId()
             };
         }
     }

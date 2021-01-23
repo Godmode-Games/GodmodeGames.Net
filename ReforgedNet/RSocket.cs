@@ -17,32 +17,97 @@ namespace ReforgedNet
 
     public abstract class RSocket
     {
-        protected Queue<RNetworkMsg> _outgoingMsgQueue;
-        protected Queue<RNetworkMsg> _incomingMsgQueue;
+        public const int SENDING_IDLE_DELAY = 1000 / 50;
 
-        protected ConcurrentQueue<RNetworkMsg> _outgoingThreadsafeMsgQueue;
-        protected ConcurrentQueue<RNetworkMsg> _incomingThreadsafeMsgQueue;
+        private ConcurrentQueue<RNetMessage> _outgoingMsgQueue;
+        private ConcurrentQueue<RNetMessage> _incomingMsgQueue;
 
-        private RPacketSerializer _serializer;
+        private ICollection<ReceiveDelegate> _receiveDelegates;
 
-        public RSocket()
+        private IPacketSerializer _serializer;
+
+        private Socket _socket;
+
+        private Task _recvTask;
+        private Task _sendTask;
+
+        public RSocket(CancellationToken cancellationToken)
         {
-            // Start receiver thread.
-            //Thread t = new Thread(new ParameterizedThreadStart(new Socket()))
-            //t.Start();
+            _receiveDelegates = new List<ReceiveDelegate>();
+
+            _recvTask = Task.Factory.StartNew(() => ReceivingTask(cancellationToken), cancellationToken);
+            _recvTask.ConfigureAwait(false);
+            _sendTask = Task.Factory.StartNew(() => SendingTask(cancellationToken), cancellationToken);
+            _sendTask.ConfigureAwait(false);
         }
 
-        protected async Task<int> Send(Socket socket, RBasePacket packet, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Adds network message to outgoing message queue.
+        /// </summary>
+        /// <param name="message"></param>
+        public void Send(RNetMessage message)
+            => _outgoingMsgQueue.Enqueue(message); // TODO: Add validation?
+
+        public void RegisterReceiver(ReceiveDelegate @delegate)
+            => _receiveDelegates.Add(@delegate);
+
+        public void Dispatch()
         {
-            return await socket.SendAsync(_serializer.Serialize(packet), SocketFlags.None, cancellationToken);
+
         }
 
-        protected async Task<(int, Memory<byte>)> Receive(Socket socket, CancellationToken cancellationToken = default)
+        private async Task SendingTask(CancellationToken cancellationToken)
         {
-            Memory<byte> buffer = new Memory<byte>();
-            int numberOfBytes = await socket.ReceiveAsync(buffer, SocketFlags.None, cancellationToken);
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                if (!_outgoingMsgQueue.IsEmpty)
+                {
+                    if (_outgoingMsgQueue.TryDequeue(out RNetMessage netMsg))
+                    {
+                        byte[] data = _serializer.Serialize(netMsg);
 
-            return (numberOfBytes, buffer);
+                        int numOfSentBytes = await _socket.SendToAsync(data, SocketFlags.None, netMsg.RemoteEndPoint);
+                    }
+                }
+                else
+                {
+                    // Nothing to do, take a short break.
+                    await Task.Delay(SENDING_IDLE_DELAY);
+                }
+            }
+        }
+
+        private void ReceivingTask(CancellationToken cancellationToken)
+        {
+            SocketAsyncEventArgs args = new SocketAsyncEventArgs();
+            args.SetBuffer(new Memory<byte>());
+
+            args.Completed += (object sender, SocketAsyncEventArgs e) =>
+            {
+                // Load information and start listening again.
+                int numOfRecvBytes = e.BytesTransferred;
+                byte[] data = e.MemoryBuffer.ToArray();
+                var ep = e.RemoteEndPoint;
+
+                // Start receiving again, if cancellation is not requested.
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    _socket.ReceiveFromAsync(args);
+                }
+
+                if (numOfRecvBytes > 0 && numOfRecvBytes == data.Length)
+                {
+                    _incomingMsgQueue.Enqueue(_serializer.Deserialize(data));
+                }
+                else
+                {
+                    // Log Exception
+                }
+
+            };
+            
+            // Start receiving loop.
+            _socket.ReceiveFromAsync(args);
         }
     }
 }

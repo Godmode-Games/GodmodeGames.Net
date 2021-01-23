@@ -5,27 +5,21 @@ using System.Text;
 
 namespace ReforgedNet.Serialization
 {
-    public class RJsonSerialization : RPacketSerializer
+    public class RJsonSerialization : IPacketSerializer
     {
-        /// <summary>
-        /// <inheritdoc/>
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="data"></param>
-        /// <returns></returns>
-        public override T Deserialize<T>(byte[] data)
+        public bool IsRequest(byte[] data)
         {
-            return JsonConvert.DeserializeObject<T>(ASCIIEncoding.UTF8.GetString(data));
+            return ASCIIEncoding.UTF8.GetString(data)?.Contains("method") ?? false;
         }
 
-        /// <summary>
-        /// <inheritdoc/>
-        /// </summary>
-        /// <param name="packet"></param>
-        /// <returns></returns>
-        public override byte[] Serialize(RBasePacket packet)
+        public byte[] Serialize(RNetMessage message)
         {
-            return ASCIIEncoding.UTF8.GetBytes(JsonConvert.SerializeObject(packet));
+            return ASCIIEncoding.UTF8.GetBytes(JsonConvert.SerializeObject(message));
+        }
+
+        public RNetMessage Deserialize(byte[] data)
+        {
+            return JsonConvert.DeserializeObject<RNetMessage>(ASCIIEncoding.UTF8.GetString(data));
         }
     }
 }

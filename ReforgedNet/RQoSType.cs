@@ -4,7 +4,7 @@ using System.Text;
 
 namespace ReforgedNet
 {
-    public enum RSendingChannel
+    public enum RQoSType
     {
         Unrealiable,
         Realiable,
