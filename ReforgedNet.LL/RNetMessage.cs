@@ -25,21 +25,25 @@ namespace ReforgedNet.LL
         /// As a fallback for the message name for better compression.
         /// </summary>
         public readonly int? MessageId;
-        public RNetMessageParameter[] Params = new RNetMessageParameter[0];
+        public readonly byte[] Data;
         public int? TransactionId;
         public EndPoint RemoteEndPoint;
         public RQoSType QoSType = RQoSType.Unrealiable;
 
-        public RNetMessage(string method, EndPoint remoteEP)
+        public RNetMessage(string method, byte[] data, EndPoint remoteEP, RQoSType qosType = RQoSType.Unrealiable)
         {
             Method = method;
+            Data = data;
             RemoteEndPoint = remoteEP;
+            QoSType = qosType;
         }
 
-        public RNetMessage(int messageId, EndPoint remoteEP)
+        public RNetMessage(int messageId, byte[] data, EndPoint remoteEP, RQoSType qosType = RQoSType.Unrealiable)
         {
             MessageId = messageId;
+            Data = data;
             RemoteEndPoint = remoteEP;
+            QoSType = qosType;
         }
     }
 }

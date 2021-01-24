@@ -49,12 +49,15 @@ namespace ReforgedNet.LL
             _sendTask.ConfigureAwait(false);
         }
 
-        /// <summary>
-        /// Adds network message to outgoing message queue.
-        /// </summary>
-        /// <param name="message"></param>
-        public void Send(RNetMessage message)
-            => _outgoingMsgQueue.Enqueue(message); // TODO: Add validation?
+        public void Send(int messageId, ref byte[] data, EndPoint remoteEndPoint, RQoSType qoSType = RQoSType.Unrealiable)
+        {
+            _outgoingMsgQueue.Enqueue(new RNetMessage(messageId, data, remoteEndPoint, qoSType));
+        }
+
+        public void Send(string messageId, ref byte[] data, EndPoint remoteEndPoint, RQoSType qoSType = RQoSType.Unrealiable)
+        {
+            _outgoingMsgQueue.Enqueue(new RNetMessage(messageId, data, remoteEndPoint, qoSType));
+        }
 
         /// <summary>
         /// Registers receiver with message id.
