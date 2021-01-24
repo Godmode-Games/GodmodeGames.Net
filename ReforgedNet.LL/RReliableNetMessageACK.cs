@@ -5,7 +5,7 @@ using System.Text;
 namespace ReforgedNet.LL
 {
     /// <summary>
-    /// Network message to identify received messages.
+    /// Network message to tell notify remote endpoint of received messages.
     /// </summary>
     public class RReliableNetMessageACK
     {

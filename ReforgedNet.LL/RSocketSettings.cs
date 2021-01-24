@@ -4,5 +4,8 @@ using System.Text;
 
 namespace ReforgedNet.LL
 {
-    public delegate void ReceiveDelegate(RNetMessage message);
+    public class RSocketSettings
+    {
+        private int SendTickrate = 50;
+    }
 }

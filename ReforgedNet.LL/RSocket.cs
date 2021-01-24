@@ -27,16 +27,19 @@ namespace ReforgedNet.LL
         private IList<ReceiveDelegateDefinition> _receiveDelegates;
 
         private readonly Socket _socket;
+        private readonly RSocketSettings _settings;
         private readonly IPacketSerializer _serializer;
         private readonly ILogger? _logger;
 
         private Task _recvTask;
         private Task _sendTask;
 
-        public RSocket(Socket socket, IPacketSerializer serializer, CancellationToken cancellationToken)
+        public RSocket(Socket socket, RSocketSettings settings, IPacketSerializer serializer, ILogger? logger, CancellationToken cancellationToken)
         {
             _socket = socket;
+            _settings = settings;
             _serializer = serializer;
+            _logger = logger;
 
             _receiveDelegates = new List<ReceiveDelegateDefinition>();
 
@@ -55,6 +58,7 @@ namespace ReforgedNet.LL
 
         /// <summary>
         /// Registers receiver with message id.
+        /// This function is not threadsafe and should only gets called from dispatcher thread.
         /// </summary>
         /// <param name="messageId"></param>
         /// <param name="delegate"></param>
@@ -67,6 +71,7 @@ namespace ReforgedNet.LL
 
         /// <summary>
         /// Registers receiver with method name.
+        /// This function is not threadsafe and should only gets called from dispatcher thread.
         /// </summary>
         /// <param name="method"></param>
         /// <param name="delegate"></param>
@@ -78,6 +83,7 @@ namespace ReforgedNet.LL
         }
 
         /// <summary>
+        /// Unregisters receiver.
         /// This function is not threadsafe and should only gets called from dispatcher thread.
         /// </summary>
         /// <param name="messageId"></param>
@@ -96,6 +102,7 @@ namespace ReforgedNet.LL
         }
 
         /// <summary>
+        /// Unregisters receiver.
         /// This function is not threadsafe and should only gets called from dispatcher thread.
         /// </summary>
         /// <param name="method"></param>
@@ -156,7 +163,7 @@ namespace ReforgedNet.LL
                 }
                 else
                 {
-                    // Procceed unanswered reliable message inside the queue.
+                    // Procceed unacknowledged reliable message inside the queue.
                     if (!_sentUnacknowledgedMessages.IsEmpty)
                     {
                         foreach (var unAckMsg in _sentUnacknowledgedMessages)
@@ -164,6 +171,14 @@ namespace ReforgedNet.LL
                             if (unAckMsg.Value.NextRetryTime > DateTime.Now)
                             {
                                 int numOfSentBytes = await _socket.SendToAsync(unAckMsg.Value.SentData, SocketFlags.None, unAckMsg.Value.RemoteEndPoint);
+
+                                if (numOfSentBytes != unAckMsg.Value.SentData.Length)
+                                {
+                                    // Write log
+                                }
+
+                                ++unAckMsg.Value.RetriedTimes;
+                                unAckMsg.Value.NextRetryTime = DateTime.Now;
                             }
                         }
                     }
@@ -198,7 +213,7 @@ namespace ReforgedNet.LL
                     {
                         _incomingMsgQueue.Enqueue(_serializer.Deserialize(data));
                     }
-                    else if (_serializer.IsValidReliableMessageACK(data))
+                    else if (_serializer.IsMessageACK(data))
                     {
                         var ackMsg = _serializer.DeserializeACKMessage(data);
                         if (!RemoveSentMessageFromUnacknowledgedMsgQueue(ackMsg))
@@ -240,6 +255,11 @@ namespace ReforgedNet.LL
             _socket.ReceiveFromAsync(args);
         }
 
+        /// <summary>
+        /// Removes sent message from unacknowledged message queue.
+        /// </summary>
+        /// <param name="ackMsg"></param>
+        /// <returns></returns>
         private bool RemoveSentMessageFromUnacknowledgedMsgQueue(RReliableNetMessageACK ackMsg)
         {
             return _sentUnacknowledgedMessages.Remove(ackMsg.TransactionId, out SentUnacknowledgedMessage msg);

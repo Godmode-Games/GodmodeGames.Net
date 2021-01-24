@@ -12,6 +12,9 @@ namespace ReforgedNet.LL
         public object? Value;
     }
 
+    /// <summary>
+    /// Represents information about a network message.
+    /// </summary>
     public class RNetMessage
     {
         /// <summary>
