@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -24,7 +25,17 @@ namespace ReforgedNet.LL.Serialization
 
         public bool IsValidReliableMessageACK(byte[] data)
         {
-            throw new NotImplementedException();
+            return ASCIIEncoding.UTF8.GetString(data)?.StartsWith("ack") ?? false;
+        }
+
+        public byte[] SerializeACKMessage(RReliableNetMessageACK message)
+        {
+            return ASCIIEncoding.UTF8.GetBytes("ack" + JsonConvert.SerializeObject(message));
+        }
+
+        public RReliableNetMessageACK DeserializeACKMessage(byte[] data)
+        {
+            return JsonConvert.DeserializeObject<RReliableNetMessageACK>(ASCIIEncoding.UTF8.GetString(data).Remove(0, 3));
         }
     }
 }

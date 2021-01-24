@@ -10,5 +10,7 @@ namespace ReforgedNet.LL.Serialization
         public RNetMessage Deserialize(byte[] data);
         public bool IsRequest(byte[] data);
         public bool IsValidReliableMessageACK(byte[] data);
+        public byte[] SerializeACKMessage(RReliableNetMessageACK message);
+        public RReliableNetMessageACK DeserializeACKMessage(byte[] data);
     }
 }

@@ -1,4 +1,5 @@
-﻿using ReforgedNet.LL.Serialization;
+﻿using ReforgedNet.LL.Internal;
+using ReforgedNet.LL.Serialization;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -16,13 +17,18 @@ namespace ReforgedNet.LL
         public const int SENT_RELIABLE_MESSAGE_RETRY_DELAY = 1000 / 10;
 
         private ConcurrentQueue<RNetMessage> _outgoingMsgQueue = new ConcurrentQueue<RNetMessage>();
-        private ConcurrentBag<(RNetMessage, DateTime)> _sentUnansweredMsgQueue = new ConcurrentBag<(RNetMessage, DateTime)>();
+        /// <summary>
+        /// Holds information about sent unacknowledged messages.
+        /// Key is transaction id.
+        /// </summary>
+        private ConcurrentDictionary<int, SentUnacknowledgedMessage> _sentUnacknowledgedMessages = new ConcurrentDictionary<int, SentUnacknowledgedMessage>();
         private ConcurrentQueue<RNetMessage> _incomingMsgQueue = new ConcurrentQueue<RNetMessage>();
 
         private IList<ReceiveDelegateDefinition> _receiveDelegates;
 
         private readonly Socket _socket;
         private readonly IPacketSerializer _serializer;
+        private readonly ILogger? _logger;
 
         private Task _recvTask;
         private Task _sendTask;
@@ -144,21 +150,20 @@ namespace ReforgedNet.LL
 
                         if (netMsg.QoSType == RQoSType.Realiable)
                         {
-                            _sentUnansweredMsgQueue.Add((netMsg, DateTime.Now.AddMilliseconds(SENT_RELIABLE_MESSAGE_RETRY_DELAY)));
+                            _sentUnacknowledgedMessages.TryAdd(netMsg.TransactionId!.Value, new SentUnacknowledgedMessage(data, netMsg.RemoteEndPoint));
                         }
                     }
                 }
                 else
                 {
                     // Procceed unanswered reliable message inside the queue.
-                    if (!_sentUnansweredMsgQueue.IsEmpty)
+                    if (!_sentUnacknowledgedMessages.IsEmpty)
                     {
-                        foreach (var netMsg in _sentUnansweredMsgQueue)
+                        foreach (var unAckMsg in _sentUnacknowledgedMessages)
                         {
-                            if (netMsg.Item2 > DateTime.Now)
+                            if (unAckMsg.Value.NextRetryTime > DateTime.Now)
                             {
-                                byte[] data = _serializer.Serialize(netMsg.Item1);
-                                int numOfSentBytes = await _socket.SendToAsync(data, SocketFlags.None, netMsg.Item1.RemoteEndPoint);
+                                int numOfSentBytes = await _socket.SendToAsync(unAckMsg.Value.SentData, SocketFlags.None, unAckMsg.Value.RemoteEndPoint);
                             }
                         }
                     }
@@ -189,7 +194,36 @@ namespace ReforgedNet.LL
 
                 if (numOfRecvBytes > 0 && numOfRecvBytes == data.Length)
                 {
-                    _incomingMsgQueue.Enqueue(_serializer.Deserialize(data));
+                    if (_serializer.IsRequest(data))
+                    {
+                        _incomingMsgQueue.Enqueue(_serializer.Deserialize(data));
+                    }
+                    else if (_serializer.IsValidReliableMessageACK(data))
+                    {
+                        var ackMsg = _serializer.DeserializeACKMessage(data);
+                        if (!RemoveSentMessageFromUnacknowledgedMsgQueue(ackMsg))
+                        {
+                            var errorMsg = "Can't remove non existing network message from unacknowledged message list.";
+                            if (ackMsg.MessageId != null)
+                            {
+                                errorMsg += " MessageId: " + ackMsg.MessageId;
+                            }
+                            else if (ackMsg.Method != null)
+                            {
+                                errorMsg += " Method: " + ackMsg.Method;
+                            }
+                            errorMsg += " TransactionId: " + ackMsg.TransactionId;
+#if DEBUG
+                            throw new Exception(errorMsg);
+#elif RELEASE
+                            _logger?.WriteError(new LogInfo()
+                            {
+                                OccuredDateTime = DateTime.Now,
+                                Message = errorMsg
+                            });
+#endif
+                        }
+                    }
                 }
                 else
                 {
@@ -204,6 +238,11 @@ namespace ReforgedNet.LL
             
             // Start receiving loop.
             _socket.ReceiveFromAsync(args);
+        }
+
+        private bool RemoveSentMessageFromUnacknowledgedMsgQueue(RReliableNetMessageACK ackMsg)
+        {
+            return _sentUnacknowledgedMessages.Remove(ackMsg.TransactionId, out SentUnacknowledgedMessage msg);
         }
     }
 }
