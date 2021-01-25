@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Text;
@@ -27,7 +28,9 @@ namespace ReforgedNet.LL
         public readonly int? MessageId;
         public readonly byte[] Data;
         public int? TransactionId;
+        [JsonIgnore]
         public EndPoint RemoteEndPoint;
+        [JsonIgnore]
         public RQoSType QoSType = RQoSType.Unrealiable;
 
         public RNetMessage(string method, byte[] data, EndPoint remoteEP, RQoSType qosType = RQoSType.Unrealiable)
