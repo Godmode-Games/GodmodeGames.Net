@@ -30,16 +30,18 @@ namespace ReforgedNet.LL
         private readonly RSocketSettings _settings;
         private readonly IPacketSerializer _serializer;
         private readonly ILogger? _logger;
+        private readonly IPEndPoint _EndPoint;
 
         private Task _recvTask;
         private Task _sendTask;
 
-        public RSocket(Socket socket, RSocketSettings settings, IPacketSerializer serializer, ILogger? logger, CancellationToken cancellationToken)
+        public RSocket(Socket socket, RSocketSettings settings, IPacketSerializer serializer, IPEndPoint ep, ILogger? logger, CancellationToken cancellationToken)
         {
             _socket = socket;
             _settings = settings;
             _serializer = serializer;
             _logger = logger;
+            _EndPoint = ep;
 
             _receiveDelegates = new List<ReceiveDelegateDefinition>();
 
@@ -196,6 +198,7 @@ namespace ReforgedNet.LL
         {
             SocketAsyncEventArgs args = new SocketAsyncEventArgs();
             args.SetBuffer(new Memory<byte>());
+            args.RemoteEndPoint = _EndPoint;
 
             args.Completed += (object sender, SocketAsyncEventArgs e) =>
             {
