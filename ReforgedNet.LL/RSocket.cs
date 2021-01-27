@@ -133,7 +133,8 @@ namespace ReforgedNet.LL
         {
             if (!_incomingMsgQueue.IsEmpty)
             {
-                foreach (var netMsg in _incomingMsgQueue)
+                RNetMessage netMsg = null;
+                while (_incomingMsgQueue.TryDequeue(out netMsg))
                 {
                     for (int i = 0; i < _receiveDelegates.Count; ++i)
                     {

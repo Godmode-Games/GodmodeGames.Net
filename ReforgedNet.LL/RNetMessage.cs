@@ -21,12 +21,12 @@ namespace ReforgedNet.LL
         /// <summary>
         /// Holds information about the invoked method name.
         /// </summary>
-        public readonly string? Method;
+        public string? Method;
         /// <summary>
         /// As a fallback for the message name for better compression.
         /// </summary>
-        public readonly int? MessageId;
-        public readonly byte[] Data;
+        public int? MessageId;
+        public byte[] Data;
         public int? TransactionId;
         [JsonIgnore]
         public EndPoint RemoteEndPoint;
