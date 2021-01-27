@@ -33,6 +33,15 @@ namespace ReforgedNet.LL
         [JsonIgnore]
         public RQoSType QoSType = RQoSType.Unrealiable;
 
+        public RNetMessage()
+        {
+            //Für den De-Serializer
+            Method = null;
+            Data = new byte[0];
+            RemoteEndPoint = new IPEndPoint(IPAddress.Any, 5000);
+            QoSType = RQoSType.Unrealiable;
+        }
+
         public RNetMessage(string method, byte[] data, EndPoint remoteEP, RQoSType qosType = RQoSType.Unrealiable)
         {
             Method = method;
