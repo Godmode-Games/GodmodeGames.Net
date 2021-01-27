@@ -138,8 +138,9 @@ namespace ReforgedNet.LL
                 {
                     for (int i = 0; i < _receiveDelegates.Count; ++i)
                     {
-                        if (_receiveDelegates[i].MessageId != null && _receiveDelegates[i].MessageId == netMsg.MessageId
-                            || _receiveDelegates[i].Method != null && _receiveDelegates[i].Method == netMsg.Method)
+                        if (_receiveDelegates[i].MessageId < 0 ||
+                            (_receiveDelegates[i].MessageId != null && _receiveDelegates[i].MessageId == netMsg.MessageId)
+                            || (_receiveDelegates[i].Method != null && _receiveDelegates[i].Method == netMsg.Method))
                         {
                             _receiveDelegates[i].ReceiveDelegate.Invoke(netMsg);
                             break;
