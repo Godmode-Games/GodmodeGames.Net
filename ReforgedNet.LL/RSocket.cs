@@ -197,14 +197,18 @@ namespace ReforgedNet.LL
         private void ReceivingTask(CancellationToken cancellationToken)
         {
             SocketAsyncEventArgs args = new SocketAsyncEventArgs();
-            args.SetBuffer(new Memory<byte>());
+            //args.SetBuffer(new Memory<byte>());
+            byte[] asyncBuffer = new byte[8 * 1024];
+            args.SetBuffer(asyncBuffer, 0, asyncBuffer.Length);
             args.RemoteEndPoint = _EndPoint;
 
             args.Completed += (object sender, SocketAsyncEventArgs e) =>
             {
                 // Load information and start listening again.
                 int numOfRecvBytes = e.BytesTransferred;
-                byte[] data = e.MemoryBuffer.ToArray();
+                //byte[] data = e.MemoryBuffer.ToArray();
+                byte[] data = new byte[numOfRecvBytes];
+                Array.Copy(e.Buffer, e.Offset, data, 0, numOfRecvBytes);
                 var ep = e.RemoteEndPoint;
 
                 // Start receiving again, if cancellation is not requested.
