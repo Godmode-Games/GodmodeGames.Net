@@ -219,7 +219,7 @@ namespace ReforgedNet.LL
                     _socket.ReceiveFromAsync(args);
                 }
 
-                if (numOfRecvBytes > 0 && numOfRecvBytes == data.Length)
+                if (numOfRecvBytes > 0)
                 {
                     if (_serializer.IsRequest(data))
                     {
@@ -252,14 +252,14 @@ namespace ReforgedNet.LL
                         }
                     }
                 }
-                else
+                /*else
                 {
 #if DEBUG
                     throw new IndexOutOfRangeException($"Received message with a length of 0 or buffer length unequal num of received bytes. NumberOfReceivedBytes {numOfRecvBytes} - Buffer length: {e.Buffer.Length}");
 #elif RELEASE
                     // Log message
 #endif
-                }
+                }*/
 
             };
             
