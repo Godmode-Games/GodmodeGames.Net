@@ -16,6 +16,7 @@ namespace ReforgedNet.LL.Internal
         {
             SentData = sentData;
             RemoteEndPoint = remoteEndPoint;
+            NextRetryTime = DateTime.Now.AddMilliseconds(RSocket.SENT_RELIABLE_MESSAGE_RETRY_DELAY);
         }
     }
 }

@@ -175,7 +175,7 @@ namespace ReforgedNet.LL
                     {
                         foreach (var unAckMsg in _sentUnacknowledgedMessages)
                         {
-                            if (unAckMsg.Value.NextRetryTime > DateTime.Now)
+                            if (unAckMsg.Value.NextRetryTime < DateTime.Now)
                             {
                                 int numOfSentBytes = await _socket.SendToAsync(unAckMsg.Value.SentData, SocketFlags.None, unAckMsg.Value.RemoteEndPoint);
 
@@ -185,7 +185,7 @@ namespace ReforgedNet.LL
                                 }
 
                                 ++unAckMsg.Value.RetriedTimes;
-                                unAckMsg.Value.NextRetryTime = DateTime.Now;
+                                unAckMsg.Value.NextRetryTime = DateTime.Now.AddMilliseconds(SENT_RELIABLE_MESSAGE_RETRY_DELAY);
                             }
                         }
                     }
