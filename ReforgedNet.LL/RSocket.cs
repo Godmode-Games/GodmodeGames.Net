@@ -204,67 +204,13 @@ namespace ReforgedNet.LL
             args.SetBuffer(asyncBuffer, 0, asyncBuffer.Length);
             args.RemoteEndPoint = _EndPoint;
 
-            args.Completed += (object sender, SocketAsyncEventArgs e) =>
-            {
-                // Load information and start listening again.
-                int numOfRecvBytes = e.BytesTransferred;
-                //byte[] data = e.MemoryBuffer.ToArray();
-                byte[] data = new byte[numOfRecvBytes];
-                Array.Copy(e.Buffer, e.Offset, data, 0, numOfRecvBytes);
-                var ep = e.RemoteEndPoint;
+            args.Completed += new EventHandler<SocketAsyncEventArgs>(this.ReceivedData);
 
-                // Start receiving again, if cancellation is not requested.
-                if (!cancellationToken.IsCancellationRequested)
-                {
-                    _socket.ReceiveFromAsync(args);
-                }
-
-                if (numOfRecvBytes > 0)
-                {
-                    if (_serializer.IsRequest(data))
-                    {
-                        _incomingMsgQueue.Enqueue(_serializer.Deserialize(data));
-                    }
-                    else if (_serializer.IsMessageACK(data))
-                    {
-                        var ackMsg = _serializer.DeserializeACKMessage(data);
-                        if (!RemoveSentMessageFromUnacknowledgedMsgQueue(ackMsg))
-                        {
-                            var errorMsg = "Can't remove non existing network message from unacknowledged message list.";
-                            if (ackMsg.MessageId != null)
-                            {
-                                errorMsg += " MessageId: " + ackMsg.MessageId;
-                            }
-                            else if (ackMsg.Method != null)
-                            {
-                                errorMsg += " Method: " + ackMsg.Method;
-                            }
-                            errorMsg += " TransactionId: " + ackMsg.TransactionId;
-#if DEBUG
-                            throw new Exception(errorMsg);
-#elif RELEASE
-                            _logger?.WriteError(new LogInfo()
-                            {
-                                OccuredDateTime = DateTime.Now,
-                                Message = errorMsg
-                            });
-#endif
-                        }
-                    }
-                }
-                /*else
-                {
-#if DEBUG
-                    throw new IndexOutOfRangeException($"Received message with a length of 0 or buffer length unequal num of received bytes. NumberOfReceivedBytes {numOfRecvBytes} - Buffer length: {e.Buffer.Length}");
-#elif RELEASE
-                    // Log message
-#endif
-                }*/
-
-            };
-            
             // Start receiving loop.
-            _socket.ReceiveFromAsync(args);
+            if (!_socket.ReceiveFromAsync(args))
+            {
+                this.ReceivedData(_socket, args);
+            }
         }
 
         /// <summary>
@@ -275,6 +221,60 @@ namespace ReforgedNet.LL
         private bool RemoveSentMessageFromUnacknowledgedMsgQueue(RReliableNetMessageACK ackMsg)
         {
             return _sentUnacknowledgedMessages.Remove(ackMsg.TransactionId, out SentUnacknowledgedMessage msg);
+        }
+
+        /// <summary>
+        /// Receive data async
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void ReceivedData(object sender, SocketAsyncEventArgs e)
+        {
+            // Load information and start listening again.
+            int numOfRecvBytes = e.BytesTransferred;
+            //byte[] data = e.MemoryBuffer.ToArray();
+            byte[] data = new byte[numOfRecvBytes];
+            Array.Copy(e.Buffer, e.Offset, data, 0, numOfRecvBytes);
+            var ep = e.RemoteEndPoint;
+
+            if (!_socket.ReceiveFromAsync(e))
+            {
+                this.ReceivedData(sender, e);
+            }
+
+            if (numOfRecvBytes > 0)
+            {
+                if (_serializer.IsRequest(data))
+                {
+                    _incomingMsgQueue.Enqueue(_serializer.Deserialize(data));
+                }
+                else if (_serializer.IsMessageACK(data))
+                {
+                    var ackMsg = _serializer.DeserializeACKMessage(data);
+                    if (!RemoveSentMessageFromUnacknowledgedMsgQueue(ackMsg))
+                    {
+                        var errorMsg = "Can't remove non existing network message from unacknowledged message list.";
+                        if (ackMsg.MessageId != null)
+                        {
+                            errorMsg += " MessageId: " + ackMsg.MessageId;
+                        }
+                        else if (ackMsg.Method != null)
+                        {
+                            errorMsg += " Method: " + ackMsg.Method;
+                        }
+                        errorMsg += " TransactionId: " + ackMsg.TransactionId;
+#if DEBUG
+                        throw new Exception(errorMsg);
+#elif RELEASE
+                                _logger?.WriteError(new LogInfo()
+                                {
+                                    OccuredDateTime = DateTime.Now,
+                                    Message = errorMsg
+                                });
+#endif
+                    }
+                }
+            }
         }
     }
 }
