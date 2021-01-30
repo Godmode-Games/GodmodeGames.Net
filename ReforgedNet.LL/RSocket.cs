@@ -16,15 +16,16 @@ namespace ReforgedNet.LL
         public const int SENDING_IDLE_DELAY = 1000 / 50;
         public const int SENT_RELIABLE_MESSAGE_RETRY_DELAY = 1000 / 10;
 
-        private ConcurrentQueue<RNetMessage> _outgoingMsgQueue = new ConcurrentQueue<RNetMessage>();
-        /// <summary>
-        /// Holds information about sent unacknowledged messages.
-        /// Key is transaction id.
-        /// </summary>
-        private ConcurrentDictionary<int, SentUnacknowledgedMessage> _sentUnacknowledgedMessages = new ConcurrentDictionary<int, SentUnacknowledgedMessage>();
-        private ConcurrentQueue<RNetMessage> _incomingMsgQueue = new ConcurrentQueue<RNetMessage>();
+        private ConcurrentQueue<RNetMessage> _outgoingMsgQueue
+            = new ConcurrentQueue<RNetMessage>();
+        /// <summary>Holds information about sent unacknowledged messages. Key is transaction id.</summary>
+        private ConcurrentDictionary<int, SentUnacknowledgedMessage> _sentUnacknowledgedMessages
+            = new ConcurrentDictionary<int, SentUnacknowledgedMessage>();
+        private ConcurrentQueue<RNetMessage> _incomingMsgQueue
+            = new ConcurrentQueue<RNetMessage>();
 
-        private IList<ReceiveDelegateDefinition> _receiveDelegates;
+        private IList<ReceiveDelegateDefinition> _receiveDelegates
+            = new List<ReceiveDelegateDefinition>();
 
         private readonly Socket _socket;
         private readonly RSocketSettings _settings;
@@ -32,18 +33,16 @@ namespace ReforgedNet.LL
         private readonly ILogger? _logger;
         private readonly EndPoint _receiveEndPoint;
 
-        private Task _recvTask;
-        private Task _sendTask;
+        private readonly Task _recvTask;
+        private readonly Task _sendTask;
 
-        public RSocket(Socket socket, RSocketSettings settings, IPacketSerializer serializer, IPEndPoint ep, ILogger? logger, CancellationToken cancellationToken)
+        public RSocket(Socket socket, RSocketSettings settings, IPacketSerializer serializer, IPEndPoint remoteEndPoint, ILogger? logger, CancellationToken cancellationToken)
         {
             _socket = socket;
             _settings = settings;
             _serializer = serializer;
             _logger = logger;
-            _receiveEndPoint = ep;
-
-            _receiveDelegates = new List<ReceiveDelegateDefinition>();
+            _receiveEndPoint = remoteEndPoint;
 
             _recvTask = Task.Factory.StartNew(() => ReceivingTask(cancellationToken), cancellationToken);
             _recvTask.ConfigureAwait(false);
@@ -51,9 +50,20 @@ namespace ReforgedNet.LL
             _sendTask.ConfigureAwait(false);
         }
 
-        public void Send(int messageId, ref byte[] data, EndPoint remoteEndPoint, RQoSType qoSType = RQoSType.Unrealiable)
+        /// <summary>
+        /// Enqueues message in sending queue, uses own implementation of <see cref="RTransactionGenerator"/> if qosType is reliable.
+        /// </summary>
+        /// <param name="messageId"></param>
+        /// <param name="data"></param>
+        /// <param name="remoteEndPoint"></param>
+        /// <param name="qosType"></param>
+        public void Send(int messageId, ref byte[] data, EndPoint remoteEndPoint, RQoSType qosType = RQoSType.Unrealiable)
         {
-            _outgoingMsgQueue.Enqueue(new RNetMessage(messageId, data, remoteEndPoint, qoSType));
+            var message = (qosType == RQoSType.Realiable) ?
+                new RNetMessage(messageId, data, RTransactionGenerator.GenerateId(), remoteEndPoint, qosType) :
+                new RNetMessage(messageId, data, null, remoteEndPoint, qosType);
+
+            _outgoingMsgQueue.Enqueue(message);
         }
 
         /// <summary>
@@ -128,8 +138,7 @@ namespace ReforgedNet.LL
         {
             if (!_incomingMsgQueue.IsEmpty)
             {
-                RNetMessage? netMsg = null;
-                while (_incomingMsgQueue.TryDequeue(out netMsg))
+                while (_incomingMsgQueue.TryDequeue(out RNetMessage netMsg))
                 {
                     for (int i = 0; i < _receiveDelegates.Count; ++i)
                     {
@@ -155,6 +164,11 @@ namespace ReforgedNet.LL
                         byte[] data = _serializer.Serialize(netMsg);
 
                         int numOfSentBytes = await _socket.SendToAsync(data, SocketFlags.None, netMsg.RemoteEndPoint);
+
+                        if (numOfSentBytes == 0)
+                        {
+                            _logger?.WriteWarning(new LogInfo("Sent empty message. MessageId: " + netMsg.MessageId.ToString()));
+                        }
 
                         if (netMsg.QoSType == RQoSType.Realiable)
                         {
@@ -215,11 +229,11 @@ namespace ReforgedNet.LL
 #if DEBUG
                             throw new Exception(errorMsg);
 #elif RELEASE
-                                _logger?.WriteError(new LogInfo()
-                                {
-                                    OccuredDateTime = DateTime.Now,
-                                    Message = errorMsg
-                                });
+                            _logger?.WriteError(new LogInfo()
+                            {
+                                OccuredDateTime = DateTime.Now,
+                                Message = errorMsg
+                            });
 #endif
                         }
                     }

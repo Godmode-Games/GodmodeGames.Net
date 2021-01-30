@@ -53,14 +53,10 @@ namespace ReforgedNet.LL.Serialization
             var message = new RNetMessage(
                 json["msgId"]!.ToObject<int>(),
                 json["data"]?.ToObject<byte[]>(),
+                json["transactionId"]?.ToObject<int>(),
                 remoteEndPoint,
                 (RQoSType)json["qos"]!.ToObject<int>()
             );
-
-            if (json.ContainsKey("transactionId"))
-            {
-                message.TransactionId = json["transactionId"]!.ToObject<int>();
-            }
 
             return message;
         }

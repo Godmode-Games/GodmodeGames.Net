@@ -8,22 +8,35 @@ using System.Text;
 namespace ReforgedNet.LL
 {
     /// <summary>
-    /// Represents information about a network message.
+    /// Holds information about network message.
     /// </summary>
-    public class RNetMessage
+    public struct RNetMessage : IEquatable<RNetMessage> 
     {
-        public int MessageId;
-        public byte[] Data;
-        public int? TransactionId;
-        public EndPoint RemoteEndPoint;
-        public RQoSType QoSType = RQoSType.Unrealiable;
+        /// <summary>Message id is used to identify different types of message types.</summary>
+        public readonly int MessageId;
+        /// <summary>Byte array of transmitted content.</summary>
+        public readonly byte[] Data;
+        /// <summary>Transaction id to identify reliable messages.</summary>
+        public readonly int? TransactionId;
+        public readonly EndPoint RemoteEndPoint;
+        public readonly RQoSType QoSType;
 
-        public RNetMessage(int messageId, byte[] data, EndPoint remoteEP, RQoSType qosType = RQoSType.Unrealiable)
+        public RNetMessage(int messageId, byte[] data, int? transactionId, EndPoint remoteEP, RQoSType qosType = RQoSType.Unrealiable)
         {
             MessageId = messageId;
             Data = data;
+            TransactionId = transactionId;
             RemoteEndPoint = remoteEP;
             QoSType = qosType;
+        }
+
+        public bool Equals(RNetMessage other)
+        {
+            return MessageId == other.MessageId &&
+                   Data == other.Data &&
+                   TransactionId == other.TransactionId &&
+                   RemoteEndPoint.Equals(other.RemoteEndPoint) &&
+                   QoSType == other.QoSType;
         }
     }
 }

@@ -6,8 +6,15 @@ namespace ReforgedNet.LL
 {
     public class LogInfo
     {
-        public DateTime OccuredDateTime;
+        public DateTime OccuredDateTime = DateTime.Now;
         public string? Message;
+
+        public LogInfo() { }
+
+        public LogInfo(string message)
+        {
+            Message = message;
+        }
     }
 
     public interface ILogger
