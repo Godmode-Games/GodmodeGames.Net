@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Text;
 
 namespace ReforgedNet.LL.Serialization
@@ -17,7 +18,7 @@ namespace ReforgedNet.LL.Serialization
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public RNetMessage Deserialize(byte[] data);
+        public RNetMessage Deserialize(byte[] data, EndPoint remoteEndPoint);
         /// <summary>
         /// Returns true if given byte array is a request.
         /// </summary>
@@ -41,6 +42,6 @@ namespace ReforgedNet.LL.Serialization
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public RReliableNetMessageACK DeserializeACKMessage(byte[] data);
+        public RReliableNetMessageACK DeserializeACKMessage(byte[] data, EndPoint remoteEndPoint);
     }
 }

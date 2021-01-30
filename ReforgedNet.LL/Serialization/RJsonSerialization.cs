@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Text;
 
 namespace ReforgedNet.LL.Serialization
@@ -15,7 +16,7 @@ namespace ReforgedNet.LL.Serialization
         /// <returns></returns>
         public bool IsRequest(byte[] data)
         {
-            return ASCIIEncoding.UTF8.GetString(data)?.Contains("MessageId") ?? false;
+            return ASCIIEncoding.UTF8.GetString(data).Contains("data");
         }
 
         /// <summary>
@@ -25,7 +26,19 @@ namespace ReforgedNet.LL.Serialization
         /// <returns></returns>
         public byte[] Serialize(RNetMessage message)
         {
-            return ASCIIEncoding.UTF8.GetBytes(JsonConvert.SerializeObject(message));
+            JObject json = new JObject();
+            json["qos"] = (int)message.QoSType;
+            json["msgid"] = message.MessageId;
+
+            if (message.TransactionId.HasValue)
+            {
+                json["transactionId"] = message!.TransactionId;
+            }
+
+            json["data"] = message.Data;
+           
+
+            return ASCIIEncoding.UTF8.GetBytes(json.ToString());
         }
 
         /// <summary>
@@ -33,9 +46,23 @@ namespace ReforgedNet.LL.Serialization
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public RNetMessage Deserialize(byte[] data)
+        public RNetMessage Deserialize(byte[] data, EndPoint remoteEndPoint)
         {
-            return JsonConvert.DeserializeObject<RNetMessage>(ASCIIEncoding.UTF8.GetString(data));
+            JObject json = new JObject(ASCIIEncoding.UTF8.GetString(data));
+
+            var message = new RNetMessage(
+                json["msgId"]!.ToObject<int>(),
+                json["data"]?.ToObject<byte[]>(),
+                remoteEndPoint,
+                (RQoSType)json["qos"]!.ToObject<int>()
+            );
+
+            if (json.ContainsKey("transactionId"))
+            {
+                message.TransactionId = json["transactionId"]!.ToObject<int>();
+            }
+
+            return message;
         }
 
         /// <summary>
@@ -45,7 +72,7 @@ namespace ReforgedNet.LL.Serialization
         /// <returns></returns>
         public bool IsMessageACK(byte[] data)
         {
-            return ASCIIEncoding.UTF8.GetString(data)?.StartsWith("ack") ?? false;
+            return !IsRequest(data);
         }
 
         /// <summary>
@@ -55,7 +82,11 @@ namespace ReforgedNet.LL.Serialization
         /// <returns></returns>
         public byte[] SerializeACKMessage(RReliableNetMessageACK message)
         {
-            return ASCIIEncoding.UTF8.GetBytes("ack" + JsonConvert.SerializeObject(message));
+            JObject json = new JObject();
+            json["msgid"] = message.MessageId;
+            json["transactionId"] = message.TransactionId;
+
+            return ASCIIEncoding.UTF8.GetBytes(json.ToString());
         }
 
         /// <summary>
@@ -63,9 +94,15 @@ namespace ReforgedNet.LL.Serialization
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public RReliableNetMessageACK DeserializeACKMessage(byte[] data)
+        public RReliableNetMessageACK DeserializeACKMessage(byte[] data, EndPoint remoteEndPoint)
         {
-            return JsonConvert.DeserializeObject<RReliableNetMessageACK>(ASCIIEncoding.UTF8.GetString(data).Remove(0, 3));
+            JObject json = new JObject(ASCIIEncoding.UTF8.GetString(data));
+
+            return new RReliableNetMessageACK(
+                json["msgId"]!.ToObject<int>(),
+                json["transactionId"]!.ToObject<int>(),
+                remoteEndPoint
+            );
         }
     }
 }

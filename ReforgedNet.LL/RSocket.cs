@@ -30,7 +30,7 @@ namespace ReforgedNet.LL
         private readonly RSocketSettings _settings;
         private readonly IPacketSerializer _serializer;
         private readonly ILogger? _logger;
-        private readonly IPEndPoint _EndPoint;
+        private readonly EndPoint _receiveEndPoint;
 
         private Task _recvTask;
         private Task _sendTask;
@@ -41,7 +41,7 @@ namespace ReforgedNet.LL
             _settings = settings;
             _serializer = serializer;
             _logger = logger;
-            _EndPoint = ep;
+            _receiveEndPoint = ep;
 
             _receiveDelegates = new List<ReceiveDelegateDefinition>();
 
@@ -52,11 +52,6 @@ namespace ReforgedNet.LL
         }
 
         public void Send(int messageId, ref byte[] data, EndPoint remoteEndPoint, RQoSType qoSType = RQoSType.Unrealiable)
-        {
-            _outgoingMsgQueue.Enqueue(new RNetMessage(messageId, data, remoteEndPoint, qoSType));
-        }
-
-        public void Send(string messageId, ref byte[] data, EndPoint remoteEndPoint, RQoSType qoSType = RQoSType.Unrealiable)
         {
             _outgoingMsgQueue.Enqueue(new RNetMessage(messageId, data, remoteEndPoint, qoSType));
         }
@@ -133,14 +128,13 @@ namespace ReforgedNet.LL
         {
             if (!_incomingMsgQueue.IsEmpty)
             {
-                RNetMessage netMsg = null;
+                RNetMessage? netMsg = null;
                 while (_incomingMsgQueue.TryDequeue(out netMsg))
                 {
                     for (int i = 0; i < _receiveDelegates.Count; ++i)
                     {
                         if (_receiveDelegates[i].MessageId < 0 ||
-                            (_receiveDelegates[i].MessageId != null && _receiveDelegates[i].MessageId == netMsg.MessageId)
-                            || (_receiveDelegates[i].Method != null && _receiveDelegates[i].Method == netMsg.Method))
+                           (_receiveDelegates[i].MessageId != null && _receiveDelegates[i].MessageId == netMsg.MessageId))
                         {
                             _receiveDelegates[i].ReceiveDelegate.Invoke(netMsg);
                             break;
@@ -196,20 +190,40 @@ namespace ReforgedNet.LL
             }
         }
 
-        private void ReceivingTask(CancellationToken cancellationToken)
+        private async Task ReceivingTask(CancellationToken cancellationToken)
         {
-            SocketAsyncEventArgs args = new SocketAsyncEventArgs();
-            //args.SetBuffer(new Memory<byte>());
-            byte[] asyncBuffer = new byte[8 * 1024];
-            args.SetBuffer(asyncBuffer, 0, asyncBuffer.Length);
-            args.RemoteEndPoint = _EndPoint;
-
-            args.Completed += new EventHandler<SocketAsyncEventArgs>(this.ReceivedData);
-
-            // Start receiving loop.
-            if (!_socket.ReceiveFromAsync(args))
+            while (true)
             {
-                this.ReceivedData(_socket, args);
+                ArraySegment<byte> data = new ArraySegment<byte>();
+
+                var result = await _socket.ReceiveFromAsync(data, SocketFlags.None, _receiveEndPoint);
+
+                if (result.ReceivedBytes > 0)
+                {
+                    var dataArray = data.Array;
+                    if (_serializer.IsRequest(data.Array))
+                    {
+                        _incomingMsgQueue.Enqueue(_serializer.Deserialize(dataArray, result.RemoteEndPoint));
+                    }
+                    else if (_serializer.IsMessageACK(dataArray))
+                    {
+                        var ackMsg = _serializer.DeserializeACKMessage(dataArray, result.RemoteEndPoint);
+                        if (!RemoveSentMessageFromUnacknowledgedMsgQueue(ackMsg))
+                        {
+                            var errorMsg = "Can't remove non existing network message from unacknowledged message list. MessageId: " + ackMsg.MessageId;
+                            errorMsg += " TransactionId: " + ackMsg.TransactionId;
+#if DEBUG
+                            throw new Exception(errorMsg);
+#elif RELEASE
+                                _logger?.WriteError(new LogInfo()
+                                {
+                                    OccuredDateTime = DateTime.Now,
+                                    Message = errorMsg
+                                });
+#endif
+                        }
+                    }
+                }
             }
         }
 
@@ -221,60 +235,6 @@ namespace ReforgedNet.LL
         private bool RemoveSentMessageFromUnacknowledgedMsgQueue(RReliableNetMessageACK ackMsg)
         {
             return _sentUnacknowledgedMessages.Remove(ackMsg.TransactionId, out SentUnacknowledgedMessage msg);
-        }
-
-        /// <summary>
-        /// Receive data async
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void ReceivedData(object sender, SocketAsyncEventArgs e)
-        {
-            // Load information and start listening again.
-            int numOfRecvBytes = e.BytesTransferred;
-            //byte[] data = e.MemoryBuffer.ToArray();
-            byte[] data = new byte[numOfRecvBytes];
-            Array.Copy(e.Buffer, e.Offset, data, 0, numOfRecvBytes);
-            var ep = e.RemoteEndPoint;
-
-            if (!_socket.ReceiveFromAsync(e))
-            {
-                this.ReceivedData(sender, e);
-            }
-
-            if (numOfRecvBytes > 0)
-            {
-                if (_serializer.IsRequest(data))
-                {
-                    _incomingMsgQueue.Enqueue(_serializer.Deserialize(data));
-                }
-                else if (_serializer.IsMessageACK(data))
-                {
-                    var ackMsg = _serializer.DeserializeACKMessage(data);
-                    if (!RemoveSentMessageFromUnacknowledgedMsgQueue(ackMsg))
-                    {
-                        var errorMsg = "Can't remove non existing network message from unacknowledged message list.";
-                        if (ackMsg.MessageId != null)
-                        {
-                            errorMsg += " MessageId: " + ackMsg.MessageId;
-                        }
-                        else if (ackMsg.Method != null)
-                        {
-                            errorMsg += " Method: " + ackMsg.Method;
-                        }
-                        errorMsg += " TransactionId: " + ackMsg.TransactionId;
-#if DEBUG
-                        throw new Exception(errorMsg);
-#elif RELEASE
-                                _logger?.WriteError(new LogInfo()
-                                {
-                                    OccuredDateTime = DateTime.Now,
-                                    Message = errorMsg
-                                });
-#endif
-                    }
-                }
-            }
         }
     }
 }

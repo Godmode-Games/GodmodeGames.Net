@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Text;
 
 namespace ReforgedNet.LL
@@ -9,20 +10,15 @@ namespace ReforgedNet.LL
     /// </summary>
     public class RReliableNetMessageACK
     {
-        public readonly int? MessageId;
-        public readonly string? Method;
+        public readonly int MessageId;
         public readonly int TransactionId;
+        public readonly EndPoint RemoteEndPoint;
 
-        public RReliableNetMessageACK(int messageId, int transactionId)
+        public RReliableNetMessageACK(int messageId, int transactionId, EndPoint remoteEndPoint)
         {
             MessageId = messageId;
             TransactionId = transactionId;
-        }
-
-        public RReliableNetMessageACK(string method, int transactionId)
-        {
-            Method = method;
-            TransactionId = transactionId;
+            RemoteEndPoint = remoteEndPoint;
         }
     }
 }
