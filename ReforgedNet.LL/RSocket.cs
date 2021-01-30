@@ -20,13 +20,13 @@ namespace ReforgedNet.LL
 
 
         /// <summary>Queue for outgoing messages.</summary>
-        private ConcurrentQueue<RNetMessage> _outgoingMsgQueue
+        private readonly ConcurrentQueue<RNetMessage> _outgoingMsgQueue
             = new ConcurrentQueue<RNetMessage>();
         /// <summary>Holds information about sent unacknowledged messages. Key is transaction id.</summary>
-        private ConcurrentDictionary<int, SentUnacknowledgedMessage> _sentUnacknowledgedMessages
+        private readonly ConcurrentDictionary<int, SentUnacknowledgedMessage> _sentUnacknowledgedMessages
             = new ConcurrentDictionary<int, SentUnacknowledgedMessage>();
         /// <summary>Queue for incoming messages which needs to be dispatched on any thread.</summary>
-        private ConcurrentQueue<RNetMessage> _incomingMsgQueue
+        private readonly ConcurrentQueue<RNetMessage> _incomingMsgQueue
             = new ConcurrentQueue<RNetMessage>();
 
         /// <summary>Registered delegates.</summary>
@@ -154,8 +154,12 @@ namespace ReforgedNet.LL
 
         private async Task SendingTask(CancellationToken cancellationToken)
         {
+            DateTime startTime;
             while (!cancellationToken.IsCancellationRequested)
             {
+                // Store start date time of receiving task to calculate an accurate sending delay.
+                startTime = DateTime.Now;
+
                 if (!_outgoingMsgQueue.IsEmpty)
                 {
                     if (_outgoingMsgQueue.TryDequeue(out RNetMessage netMsg))
@@ -177,7 +181,6 @@ namespace ReforgedNet.LL
                 }
                 else
                 {
-                    // Procceed unacknowledged reliable message inside the queue.
                     if (!_sentUnacknowledgedMessages.IsEmpty)
                     {
                         foreach (var unAckMsg in _sentUnacknowledgedMessages)
@@ -188,13 +191,26 @@ namespace ReforgedNet.LL
 
                                 if (numOfSentBytes != unAckMsg.Value.SentData.Length)
                                 {
-                                    // Write log
+                                    // Number of sent bytes unequal to message size.
+                                    var errorMsg = "Number of sent bytes unequal to message size. RemoteEndPoint: " + unAckMsg.Value.RemoteEndPoint;
+#if DEBUG
+                                    throw new Exception(errorMsg);
+#elif RELEASE
+                                    _logger?.WriteError(new LogInfo(errorMsg));
+#endif
                                 }
 
                                 if (++unAckMsg.Value.RetriedTimes > _settings.NumberOfSendRetries)
                                 {
                                     // Max number of retries reached, remove message from list and log/throw error.
                                     _sentUnacknowledgedMessages.Remove(unAckMsg.Key, out _);
+
+                                    var errorMsg = "Number of max retries reached. RemoteEndPoint: " + unAckMsg.Value.RemoteEndPoint;
+#if DEBUG
+                                    throw new Exception(errorMsg);
+#elif RELEASE
+                                    _logger?.WriteError(new LogInfo(errorMsg));
+#endif
                                     continue;
                                 }
                                     
@@ -203,8 +219,8 @@ namespace ReforgedNet.LL
                         }
                     }
 
-                    // Nothing to do, take a short break.
-                    await Task.Delay(_settings.SendTickrateInMs);
+                    // Nothing to do, take a short break. Delay = SendTickrateInMs - (Now - StartTime)
+                    await Task.Delay(_settings.SendTickrateInMs - (DateTime.Now.Subtract(startTime).Milliseconds));
                 }
             }
         }
@@ -229,8 +245,7 @@ namespace ReforgedNet.LL
                         var ackMsg = _serializer.DeserializeACKMessage(dataArray, result.RemoteEndPoint);
                         if (!RemoveSentMessageFromUnacknowledgedMsgQueue(ackMsg))
                         {
-                            var errorMsg = "Can't remove non existing network message from unacknowledged message list. MessageId: " + ackMsg.MessageId;
-                            errorMsg += " TransactionId: " + ackMsg.TransactionId;
+                            var errorMsg = "Can't remove non existing network message from unacknowledged message list. MessageId: " + ackMsg.MessageId + " TransactionId: " + ackMsg.TransactionId;
 #if DEBUG
                             throw new Exception(errorMsg);
 #elif RELEASE
