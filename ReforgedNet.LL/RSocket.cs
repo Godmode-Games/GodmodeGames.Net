@@ -233,19 +233,20 @@ namespace ReforgedNet.LL
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                var data = new ArraySegment<byte>();
+                var data = new byte[4096];
 
-                var result = await _socket.ReceiveFromAsync(data, SocketFlags.None, _receiveEndPoint);
-                if (result.ReceivedBytes > 0)
+                EndPoint remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
+                var numOfReceivedBytes = _socket.ReceiveFrom(data, 0, 4096, SocketFlags.None, ref remoteEndPoint);
+
+                if (numOfReceivedBytes > 0)
                 {
-                    var dataArray = data.Array;
-                    if (_serializer.IsRequest(data.Array))
+                    if (_serializer.IsRequest(data))
                     {
-                        _incomingMsgQueue.Enqueue(_serializer.Deserialize(dataArray, result.RemoteEndPoint));
+                        _incomingMsgQueue.Enqueue(_serializer.Deserialize(data, remoteEndPoint));
                     }
-                    else if (_serializer.IsMessageACK(dataArray))
+                    else if (_serializer.IsMessageACK(data))
                     {
-                        var ackMsg = _serializer.DeserializeACKMessage(dataArray, result.RemoteEndPoint);
+                        var ackMsg = _serializer.DeserializeACKMessage(data, remoteEndPoint);
                         if (!RemoveSentMessageFromUnacknowledgedMsgQueue(ackMsg))
                         {
                             var errorMsg = "Can't remove non existing network message from unacknowledged message list. MessageId: " + ackMsg.MessageId + " TransactionId: " + ackMsg.TransactionId;
