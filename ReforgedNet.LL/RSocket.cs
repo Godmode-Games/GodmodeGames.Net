@@ -11,18 +11,30 @@ using System.Threading.Tasks;
 
 namespace ReforgedNet.LL
 {
+    /// <summary>
+    /// Represents an abstract implementation of an UDP socket.
+    /// </summary>
     public class RSocket
     {
+        public const int DEFAULT_RECEIVER_ROUTE = int.MinValue;
+
+
+        /// <summary>Queue for outgoing messages.</summary>
         private ConcurrentQueue<RNetMessage> _outgoingMsgQueue
             = new ConcurrentQueue<RNetMessage>();
         /// <summary>Holds information about sent unacknowledged messages. Key is transaction id.</summary>
         private ConcurrentDictionary<int, SentUnacknowledgedMessage> _sentUnacknowledgedMessages
             = new ConcurrentDictionary<int, SentUnacknowledgedMessage>();
+        /// <summary>Queue for incoming messages which needs to be dispatched on any thread.</summary>
         private ConcurrentQueue<RNetMessage> _incomingMsgQueue
             = new ConcurrentQueue<RNetMessage>();
 
+        /// <summary>Registered delegates.</summary>
         private IList<ReceiveDelegateDefinition> _receiveDelegates
             = new List<ReceiveDelegateDefinition>();
+
+        private ReceiveDelegate? _defaultReceiverRoute;
+        private bool isDefaultRouteRegistered = false;
 
         private readonly Socket _socket;
         private readonly RSocketSettings _settings;
@@ -64,28 +76,21 @@ namespace ReforgedNet.LL
         }
 
         /// <summary>
-        /// Registers receiver with message id.
-        /// This function is not threadsafe and should only gets called from dispatcher thread.
+        /// Registers receiver delegate. This function is not threadsafe and should only gets called from dispatcher thread.
         /// </summary>
         /// <param name="messageId"></param>
         /// <param name="delegate"></param>
         public void RegisterReceiver(int messageId, ReceiveDelegate @delegate)
         {
+            if (messageId == DEFAULT_RECEIVER_ROUTE)
+            {
+                _defaultReceiverRoute = @delegate;
+                isDefaultRouteRegistered = true;
+                return;
+            }
+
             _receiveDelegates.Add(
                 new ReceiveDelegateDefinition(messageId, @delegate)
-            );
-        }
-
-        /// <summary>
-        /// Registers receiver with method name.
-        /// This function is not threadsafe and should only gets called from dispatcher thread.
-        /// </summary>
-        /// <param name="method"></param>
-        /// <param name="delegate"></param>
-        public void RegisterReceiver(string method, ReceiveDelegate @delegate)
-        {
-            _receiveDelegates.Add(
-                new ReceiveDelegateDefinition(method, @delegate)
             );
         }
 
@@ -96,29 +101,17 @@ namespace ReforgedNet.LL
         /// <param name="messageId"></param>
         public void UnregisterReceiver(int messageId)
         {
+            if (messageId == DEFAULT_RECEIVER_ROUTE)
+            {
+                _defaultReceiverRoute = null;
+                isDefaultRouteRegistered = false;
+                return;
+            }
+
             int index = 0;
             for (index = 0; index < _receiveDelegates.Count; ++index)
             {
                 if (_receiveDelegates[index].MessageId == messageId)
-                {
-                    break;
-                }
-            }
-
-            _receiveDelegates.RemoveAt(index);
-        }
-
-        /// <summary>
-        /// Unregisters receiver.
-        /// This function is not threadsafe and should only gets called from dispatcher thread.
-        /// </summary>
-        /// <param name="method"></param>
-        public void UnregisterReceiver(string method)
-        {
-            int index = 0;
-            for (index = 0; index < _receiveDelegates.Count; ++index)
-            {
-                if (_receiveDelegates[index].Method == method)
                 {
                     break;
                 }
@@ -137,13 +130,22 @@ namespace ReforgedNet.LL
             {
                 while (_incomingMsgQueue.TryDequeue(out RNetMessage netMsg))
                 {
-                    for (int i = 0; i < _receiveDelegates.Count; ++i)
+                    // If default route is registered, take that one.
+                    // Otherwise search for needed receiver delegate.
+                    if (isDefaultRouteRegistered)
                     {
-                        if (_receiveDelegates[i].MessageId < 0 ||
-                           (_receiveDelegates[i].MessageId != null && _receiveDelegates[i].MessageId == netMsg.MessageId))
+                        _defaultReceiverRoute!.Invoke(netMsg);
+                    }
+                    else
+                    {
+                        for (int i = 0; i < _receiveDelegates.Count; ++i)
                         {
-                            _receiveDelegates[i].ReceiveDelegate.Invoke(netMsg);
-                            break;
+                            if (_receiveDelegates[i].MessageId < 0 ||
+                               (_receiveDelegates[i].MessageId != null && _receiveDelegates[i].MessageId == netMsg.MessageId))
+                            {
+                                _receiveDelegates[i].ReceiveDelegate.Invoke(netMsg);
+                                break;
+                            }
                         }
                     }
                 }
