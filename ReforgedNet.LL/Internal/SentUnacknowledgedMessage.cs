@@ -12,11 +12,11 @@ namespace ReforgedNet.LL.Internal
         internal DateTime NextRetryTime { get; set; }
         internal int RetriedTimes { get; set; }
 
-        public SentUnacknowledgedMessage(byte[] sentData, EndPoint remoteEndPoint)
+        public SentUnacknowledgedMessage(byte[] sentData, EndPoint remoteEndPoint, DateTime nextRetryTime)
         {
             SentData = sentData;
             RemoteEndPoint = remoteEndPoint;
-            NextRetryTime = DateTime.Now.AddMilliseconds(RSocket.SENT_RELIABLE_MESSAGE_RETRY_DELAY);
+            NextRetryTime = nextRetryTime;
         }
     }
 }

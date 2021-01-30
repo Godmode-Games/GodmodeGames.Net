@@ -13,9 +13,6 @@ namespace ReforgedNet.LL
 {
     public class RSocket
     {
-        public const int SENDING_IDLE_DELAY = 1000 / 50;
-        public const int SENT_RELIABLE_MESSAGE_RETRY_DELAY = 1000 / 10;
-
         private ConcurrentQueue<RNetMessage> _outgoingMsgQueue
             = new ConcurrentQueue<RNetMessage>();
         /// <summary>Holds information about sent unacknowledged messages. Key is transaction id.</summary>
@@ -172,7 +169,7 @@ namespace ReforgedNet.LL
 
                         if (netMsg.QoSType == RQoSType.Realiable)
                         {
-                            _sentUnacknowledgedMessages.TryAdd(netMsg.TransactionId!.Value, new SentUnacknowledgedMessage(data, netMsg.RemoteEndPoint));
+                            _sentUnacknowledgedMessages.TryAdd(netMsg.TransactionId!.Value, new SentUnacknowledgedMessage(data, netMsg.RemoteEndPoint, DateTime.Now.AddMinutes(_settings.SendRetryDelay)));
                         }
                     }
                 }
@@ -192,21 +189,27 @@ namespace ReforgedNet.LL
                                     // Write log
                                 }
 
-                                ++unAckMsg.Value.RetriedTimes;
-                                unAckMsg.Value.NextRetryTime = DateTime.Now.AddMilliseconds(SENT_RELIABLE_MESSAGE_RETRY_DELAY);
+                                if (++unAckMsg.Value.RetriedTimes > _settings.NumberOfSendRetries)
+                                {
+                                    // Max number of retries reached, remove message from list and log/throw error.
+                                    _sentUnacknowledgedMessages.Remove(unAckMsg.Key, out _);
+                                    continue;
+                                }
+                                    
+                                unAckMsg.Value.NextRetryTime = DateTime.Now.AddMilliseconds(_settings.SendRetryDelay);
                             }
                         }
                     }
 
                     // Nothing to do, take a short break.
-                    await Task.Delay(SENDING_IDLE_DELAY);
+                    await Task.Delay(_settings.SendTickrateInMs);
                 }
             }
         }
 
         private async Task ReceivingTask(CancellationToken cancellationToken)
         {
-            while (true)
+            while (!cancellationToken.IsCancellationRequested)
             {
                 ArraySegment<byte> data = new ArraySegment<byte>();
 
