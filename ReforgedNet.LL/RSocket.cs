@@ -220,7 +220,11 @@ namespace ReforgedNet.LL
                     }
 
                     // Nothing to do, take a short break. Delay = SendTickrateInMs - (Now - StartTime)
-                    await Task.Delay(_settings.SendTickrateInMs - (DateTime.Now.Subtract(startTime).Milliseconds));
+                    var delay = _settings.SendTickrateInMs - (DateTime.Now.Subtract(startTime).Milliseconds);
+                    if (delay > 0)
+                    {
+                        await Task.Delay(_settings.SendTickrateInMs - (DateTime.Now.Subtract(startTime).Milliseconds));
+                    }
                 }
             }
         }
@@ -229,10 +233,9 @@ namespace ReforgedNet.LL
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                ArraySegment<byte> data = new ArraySegment<byte>();
+                var data = new ArraySegment<byte>();
 
                 var result = await _socket.ReceiveFromAsync(data, SocketFlags.None, _receiveEndPoint);
-
                 if (result.ReceivedBytes > 0)
                 {
                     var dataArray = data.Array;
