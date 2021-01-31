@@ -28,7 +28,7 @@ namespace ReforgedNet.LL.Serialization
         {
             JObject json = new JObject();
             json["qos"] = (int)message.QoSType;
-            json["msgid"] = message.MessageId;
+            json["msgId"] = message.MessageId;
 
             if (message.TransactionId.HasValue)
             {
@@ -48,7 +48,7 @@ namespace ReforgedNet.LL.Serialization
         /// <returns></returns>
         public RNetMessage Deserialize(byte[] data, EndPoint remoteEndPoint)
         {
-            JObject json = new JObject(ASCIIEncoding.UTF8.GetString(data));
+            JObject json = JObject.Parse(ASCIIEncoding.UTF8.GetString(data));
 
             var message = new RNetMessage(
                 json["msgId"]!.ToObject<int>(),
@@ -79,7 +79,7 @@ namespace ReforgedNet.LL.Serialization
         public byte[] SerializeACKMessage(RReliableNetMessageACK message)
         {
             JObject json = new JObject();
-            json["msgid"] = message.MessageId;
+            json["msgId"] = message.MessageId;
             json["transactionId"] = message.TransactionId;
 
             return ASCIIEncoding.UTF8.GetBytes(json.ToString());
@@ -92,7 +92,7 @@ namespace ReforgedNet.LL.Serialization
         /// <returns></returns>
         public RReliableNetMessageACK DeserializeACKMessage(byte[] data, EndPoint remoteEndPoint)
         {
-            JObject json = new JObject(ASCIIEncoding.UTF8.GetString(data));
+            JObject json = JObject.Parse(ASCIIEncoding.UTF8.GetString(data));
 
             return new RReliableNetMessageACK(
                 json["msgId"]!.ToObject<int>(),
