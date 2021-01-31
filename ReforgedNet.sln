@@ -5,6 +5,10 @@ VisualStudioVersion = 16.0.30804.86
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ReforgedNet.LL", "ReforgedNet.LL\ReforgedNet.LL.csproj", "{B721FFC8-5472-41FC-86EB-E3CBDB88984A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReforgedNet.Client", "Samples\ReforgedNet.Client\ReforgedNet.Client.csproj", "{A7C90692-EF33-4286-B4FE-A7BA53FA11AF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReforgedNet.Server", "Samples\ReforgedNet.Server\ReforgedNet.Server.csproj", "{34B24B9F-8A90-4C0D-9BEA-3CA235D52972}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +19,14 @@ Global
 		{B721FFC8-5472-41FC-86EB-E3CBDB88984A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B721FFC8-5472-41FC-86EB-E3CBDB88984A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B721FFC8-5472-41FC-86EB-E3CBDB88984A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A7C90692-EF33-4286-B4FE-A7BA53FA11AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A7C90692-EF33-4286-B4FE-A7BA53FA11AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A7C90692-EF33-4286-B4FE-A7BA53FA11AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A7C90692-EF33-4286-B4FE-A7BA53FA11AF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{34B24B9F-8A90-4C0D-9BEA-3CA235D52972}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{34B24B9F-8A90-4C0D-9BEA-3CA235D52972}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{34B24B9F-8A90-4C0D-9BEA-3CA235D52972}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{34B24B9F-8A90-4C0D-9BEA-3CA235D52972}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
