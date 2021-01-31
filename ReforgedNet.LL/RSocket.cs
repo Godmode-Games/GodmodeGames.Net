@@ -40,7 +40,7 @@ namespace ReforgedNet.LL
         private readonly RSocketSettings _settings;
         private readonly IPacketSerializer _serializer;
         private readonly ILogger? _logger;
-        private readonly EndPoint _receiveEndPoint;
+        private EndPoint _receiveEndPoint;
 
         private readonly Task _recvTask;
         private readonly Task _sendTask;
@@ -229,24 +229,23 @@ namespace ReforgedNet.LL
             }
         }
 
-        private async Task ReceivingTask(CancellationToken cancellationToken)
+        private void ReceivingTask(CancellationToken cancellationToken)
         {
             while (!cancellationToken.IsCancellationRequested)
             {
                 var data = new byte[4096];
 
-                EndPoint remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
-                var numOfReceivedBytes = _socket.ReceiveFrom(data, 0, 4096, SocketFlags.None, ref remoteEndPoint);
+                var numOfReceivedBytes = _socket.ReceiveFrom(data, 0, 4096, SocketFlags.None, ref _receiveEndPoint);
 
                 if (numOfReceivedBytes > 0)
                 {
                     if (_serializer.IsRequest(data))
                     {
-                        _incomingMsgQueue.Enqueue(_serializer.Deserialize(data, remoteEndPoint));
+                        _incomingMsgQueue.Enqueue(_serializer.Deserialize(data, _receiveEndPoint));
                     }
                     else if (_serializer.IsMessageACK(data))
                     {
-                        var ackMsg = _serializer.DeserializeACKMessage(data, remoteEndPoint);
+                        var ackMsg = _serializer.DeserializeACKMessage(data, _receiveEndPoint);
                         if (!RemoveSentMessageFromUnacknowledgedMsgQueue(ackMsg))
                         {
                             var errorMsg = "Can't remove non existing network message from unacknowledged message list. MessageId: " + ackMsg.MessageId + " TransactionId: " + ackMsg.TransactionId;
