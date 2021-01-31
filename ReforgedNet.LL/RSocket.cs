@@ -152,6 +152,12 @@ namespace ReforgedNet.LL
             }
         }
 
+        /// <summary>
+        /// Closes socket and releases ressources.
+        /// </summary>
+        public void Close()
+            => _socket.Close();
+
         private async Task SendingTask(CancellationToken cancellationToken)
         {
             DateTime startTime;
