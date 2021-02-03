@@ -53,7 +53,7 @@ namespace ReforgedNet.LL.Serialization
             {
                 var message = new RNetMessage(
                     null,
-                    new byte[0],
+                    json["data"]?.ToObject<byte[]>(),
                     json["transactionId"]?.ToObject<int>(),
                     remoteEndPoint,
                     RQoSType.Realiable

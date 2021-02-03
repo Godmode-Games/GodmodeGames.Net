@@ -245,10 +245,6 @@ namespace ReforgedNet.LL
 
         protected async Task ReceivingTask(CancellationToken cancellationToken)
         {
-            if (_socket == null)
-            {
-                await Task.Delay(10);
-            }
             while (!cancellationToken.IsCancellationRequested)
             {
                 var data = new byte[4096];
@@ -318,6 +314,10 @@ namespace ReforgedNet.LL
         /// </summary>
         protected void StartReceiverTask()
         {
+            if (_socket == null)
+            {
+                return;
+            }
             if (_recvTask == null)
             {
                 _recvTask = Task.Factory.StartNew(() => ReceivingTask(_cts.Token), _cts.Token);

@@ -26,13 +26,14 @@ namespace ReforgedNet.Server
             Socket = new RServerSocket(settings, remoteEndPoint, new RJsonSerialization(), null);
 
             Socket.NewClientConnection += OnNewClient;
+            Socket.CloseClientConnection += OnCloseClient;
             Socket.StartListen();
             Console.WriteLine("Server started.");
 
             // Register receiver
             Socket.RegisterReceiver(RSocket.DEFAULT_RECEIVER_ROUTE, async (RNetMessage message) =>
             {
-                Console.WriteLine($"Received from: {message.RemoteEndPoint} ,message:" + ASCIIEncoding.UTF8.GetString(message.Data));
+                Console.WriteLine($"Received from: {message.RemoteEndPoint}, message:" + ASCIIEncoding.UTF8.GetString(message.Data));
 
                 await Task.Delay(100);
 
@@ -42,6 +43,11 @@ namespace ReforgedNet.Server
 
                 Console.WriteLine($"Sent message: {messageString}, to: {message.RemoteEndPoint}");
             });
+        }
+
+        private void OnCloseClient(EndPoint ep)
+        {
+            Console.WriteLine("Connection closed: " + ep.ToString());
         }
 
         private void OnNewClient(EndPoint ep)

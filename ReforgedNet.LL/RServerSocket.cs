@@ -42,14 +42,34 @@ namespace ReforgedNet.LL
 
         private void OnDiscoverMessage(RNetMessage message)
         {
-            RNetMessage discover = new RNetMessage(null, new byte[0], message.TransactionId, message.RemoteEndPoint, RQoSType.Realiable);
+            string type = "discover";
+            try
+            {
+                type = Encoding.UTF8.GetString(message.Data);
+            }
+            catch
+            {
+
+            }
+            
+            RNetMessage discover = new RNetMessage(null, Encoding.UTF8.GetBytes(type), message.TransactionId, message.RemoteEndPoint, RQoSType.Realiable);
             _outgoingMsgQueue.Enqueue(discover);
 
-            _logger?.WriteInfo(new LogInfo("Incomming connection from " + message.RemoteEndPoint.ToString()));
-
-            if (NewClientConnection != null)
+            if (type.Equals("disconnect"))
             {
-                NewClientConnection(message.RemoteEndPoint);
+                _logger?.WriteInfo(new LogInfo("Connection closed from " + message.RemoteEndPoint.ToString()));
+                if (CloseClientConnection != null)
+                {
+                    CloseClientConnection(message.RemoteEndPoint);
+                }
+            }
+            else
+            {
+                _logger?.WriteInfo(new LogInfo("Incomming connection from " + message.RemoteEndPoint.ToString()));
+                if (NewClientConnection != null)
+                {
+                    NewClientConnection(message.RemoteEndPoint);
+                }
             }
         }
     }

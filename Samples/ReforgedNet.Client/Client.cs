@@ -35,13 +35,20 @@ namespace ReforgedNet.Client
             // Register receiver
             Socket.RegisterReceiver(RSocket.DEFAULT_RECEIVER_ROUTE, (RNetMessage message) =>
             {
-                Console.WriteLine($"Received from: {message.RemoteEndPoint} ,message:" + ASCIIEncoding.UTF8.GetString(message.Data));
+                Console.WriteLine($"Received from: {message.RemoteEndPoint}, message:" + ASCIIEncoding.UTF8.GetString(message.Data));
+                Socket.Disconnected += OnDisconnect;
+                Socket.Disconnect();
             });
 
             Console.WriteLine("Connected...");
 
             var data = ASCIIEncoding.UTF8.GetBytes("hello-server!");
             Socket.Send(RSocket.DEFAULT_RECEIVER_ROUTE, ref data, Socket.RemoteEndPoint);
+        }
+
+        private void OnDisconnect()
+        {
+            Console.WriteLine("Connection closed");
         }
     }
 }
