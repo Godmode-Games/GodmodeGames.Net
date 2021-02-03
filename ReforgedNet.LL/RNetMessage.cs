@@ -12,8 +12,8 @@ namespace ReforgedNet.LL
     /// </summary>
     public struct RNetMessage : IEquatable<RNetMessage> 
     {
-        /// <summary>Message id is used to identify different types of message types.</summary>
-        public readonly int MessageId;
+        /// <summary>Message id is used to identify different types of message types, message is discovermessage if null</summary>
+        public readonly int? MessageId;
         /// <summary>Byte array of transmitted content.</summary>
         public readonly byte[] Data;
         /// <summary>Transaction id to identify reliable messages.</summary>
@@ -21,7 +21,7 @@ namespace ReforgedNet.LL
         public readonly EndPoint RemoteEndPoint;
         public readonly RQoSType QoSType;
 
-        public RNetMessage(int messageId, byte[] data, int? transactionId, EndPoint remoteEP, RQoSType qosType = RQoSType.Unrealiable)
+        public RNetMessage(int? messageId, byte[] data, int? transactionId, EndPoint remoteEP, RQoSType qosType = RQoSType.Unrealiable)
         {
             MessageId = messageId;
             Data = data;

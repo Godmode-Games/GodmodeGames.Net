@@ -49,26 +49,28 @@ namespace ReforgedNet.LL.Serialization
         public RNetMessage Deserialize(byte[] data, EndPoint remoteEndPoint)
         {
             JObject json = JObject.Parse(ASCIIEncoding.UTF8.GetString(data));
-
-            var message = new RNetMessage(
-                json["msgId"]!.ToObject<int>(),
-                json["data"]?.ToObject<byte[]>(),
-                json["transactionId"]?.ToObject<int>(),
-                remoteEndPoint,
-                (RQoSType)json["qos"]!.ToObject<int>()
-            );
-
-            return message;
-        }
-
-        /// <summary>
-        /// <inheritdoc/>
-        /// </summary>
-        /// <param name="data"></param>
-        /// <returns></returns>
-        public bool IsMessageACK(byte[] data)
-        {
-            return !IsRequest(data);
+            if (json["msgId"]?.ToObject<int?>() == null)
+            {
+                var message = new RNetMessage(
+                    null,
+                    new byte[0],
+                    json["transactionId"]?.ToObject<int>(),
+                    remoteEndPoint,
+                    RQoSType.Realiable
+                );
+                return message;
+            }
+            else
+            {
+                var message = new RNetMessage(
+                    json["msgId"]!.ToObject<int>(),
+                    json["data"]?.ToObject<byte[]>(),
+                    json["transactionId"]?.ToObject<int>(),
+                    remoteEndPoint,
+                    (RQoSType)json["qos"]!.ToObject<int>()
+                );
+                return message;
+            }           
         }
 
         /// <summary>
@@ -94,11 +96,27 @@ namespace ReforgedNet.LL.Serialization
         {
             JObject json = JObject.Parse(ASCIIEncoding.UTF8.GetString(data));
 
-            return new RReliableNetMessageACK(
-                json["msgId"]!.ToObject<int>(),
-                json["transactionId"]!.ToObject<int>(),
-                remoteEndPoint
-            );
+            if (json["msgId"] == null)
+            {
+                return new RReliableNetMessageACK(
+                    null,
+                    json["transactionId"]!.ToObject<int>(),
+                    remoteEndPoint
+                );
+            }
+            else
+            {
+                return new RReliableNetMessageACK(
+                    json["msgId"]!.ToObject<int>(),
+                    json["transactionId"]!.ToObject<int>(),
+                    remoteEndPoint
+                );
+            }
+        }
+
+        public bool IsMessageACK(byte[] data)
+        {
+            return !IsRequest(data);
         }
     }
 }

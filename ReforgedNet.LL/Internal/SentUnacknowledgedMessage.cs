@@ -5,7 +5,7 @@ using System.Text;
 
 namespace ReforgedNet.LL.Internal
 {
-    internal class SentUnacknowledgedMessage
+    public class SentUnacknowledgedMessage
     {
         internal readonly byte[] SentData;
         internal readonly EndPoint RemoteEndPoint;

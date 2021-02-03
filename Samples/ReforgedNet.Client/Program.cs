@@ -13,31 +13,16 @@ namespace ReforgedNet.Client
     {
         static async Task Main(string[] args)
         {
-            Socket socket = new Socket(SocketType.Dgram, ProtocolType.Udp);
-            var settings = new RSocketSettings();
-            var remoteEndPoint = new IPEndPoint(IPAddress.Loopback, 7000);
-            var cancellationToken = new CancellationTokenSource();
-
-            RSocket rsocket = new RSocket(socket, settings, new RJsonSerialization(), new IPEndPoint(IPAddress.Any, 0), null, cancellationToken.Token);
-
-            // Register receiver
-            rsocket.RegisterReceiver(RSocket.DEFAULT_RECEIVER_ROUTE, (RNetMessage message) =>
-            {
-                Console.WriteLine($"Received from: {message.RemoteEndPoint} ,message:" + ASCIIEncoding.UTF8.GetString(message.Data));
-            });
-
-            Console.WriteLine("Client started.");
-
-            var data = ASCIIEncoding.UTF8.GetBytes("hello-server!");
-            rsocket.Send(RSocket.DEFAULT_RECEIVER_ROUTE, ref data, remoteEndPoint);
+            Client client = new Client();
+            client.Connect();
 
             while (true)
             {
-                rsocket.Dispatch();
+                client.Socket.Dispatch();
                 await Task.Delay(100);
             }
 
-            rsocket.Close();
+            client.Socket.Close();
         }
     }
 }

@@ -18,45 +18,46 @@ namespace ReforgedNet.LL
     {
         public const int DEFAULT_RECEIVER_ROUTE = int.MinValue;
 
-
         /// <summary>Queue for outgoing messages.</summary>
-        private readonly ConcurrentQueue<RNetMessage> _outgoingMsgQueue
+        protected readonly ConcurrentQueue<RNetMessage> _outgoingMsgQueue
             = new ConcurrentQueue<RNetMessage>();
         /// <summary>Holds information about sent unacknowledged messages. Key is transaction id.</summary>
-        private readonly ConcurrentDictionary<int, SentUnacknowledgedMessage> _sentUnacknowledgedMessages
+        protected readonly ConcurrentDictionary<int, SentUnacknowledgedMessage> _sentUnacknowledgedMessages
             = new ConcurrentDictionary<int, SentUnacknowledgedMessage>();
         /// <summary>Queue for incoming messages which needs to be dispatched on any thread.</summary>
-        private readonly ConcurrentQueue<RNetMessage> _incomingMsgQueue
+        protected readonly ConcurrentQueue<RNetMessage> _incomingMsgQueue
             = new ConcurrentQueue<RNetMessage>();
 
         /// <summary>Registered delegates.</summary>
-        private IList<ReceiveDelegateDefinition> _receiveDelegates
+        protected IList<ReceiveDelegateDefinition> _receiveDelegates
             = new List<ReceiveDelegateDefinition>();
 
-        private ReceiveDelegate? _defaultReceiverRoute;
-        private bool isDefaultRouteRegistered = false;
+        protected ReceiveDelegate? _defaultReceiverRoute;
+        protected bool isDefaultRouteRegistered = false;
 
-        private readonly Socket _socket;
-        private readonly RSocketSettings _settings;
-        private readonly IPacketSerializer _serializer;
-        private readonly ILogger? _logger;
-        private EndPoint _receiveEndPoint;
+        protected Socket? _socket;
+        protected readonly RSocketSettings _settings;
+        protected readonly IPacketSerializer _serializer;
+        protected readonly ILogger? _logger;
+        public EndPoint RemoteEndPoint;
 
-        private readonly Task _recvTask;
-        private readonly Task _sendTask;
+        protected Task? _recvTask = null;
+        protected Task? _sendTask = null;
+        protected CancellationTokenSource _cts;
 
-        public RSocket(Socket socket, RSocketSettings settings, IPacketSerializer serializer, IPEndPoint remoteEndPoint, ILogger? logger, CancellationToken cancellationToken)
+        public RSocket(RSocketSettings settings, IPEndPoint remoteEndPoint, IPacketSerializer serializer, ILogger? logger)
         {
-            _socket = socket;
             _settings = settings;
             _serializer = serializer;
             _logger = logger;
-            _receiveEndPoint = remoteEndPoint;
+            RemoteEndPoint = remoteEndPoint;
 
-            _recvTask = Task.Factory.StartNew(() => ReceivingTask(cancellationToken), cancellationToken);
+            _cts = new CancellationTokenSource();
+
+            /*_recvTask = Task.Factory.StartNew(() => ReceivingTask(cancellationToken), cancellationToken);
             _recvTask.ConfigureAwait(false);
             _sendTask = Task.Factory.StartNew(() => SendingTask(cancellationToken), cancellationToken);
-            _sendTask.ConfigureAwait(false);
+            _sendTask.ConfigureAwait(false);*/
         }
 
         /// <summary>
@@ -80,7 +81,7 @@ namespace ReforgedNet.LL
         /// </summary>
         /// <param name="messageId"></param>
         /// <param name="delegate"></param>
-        public void RegisterReceiver(int messageId, ReceiveDelegate @delegate)
+        public void RegisterReceiver(int? messageId, ReceiveDelegate @delegate)
         {
             if (messageId == DEFAULT_RECEIVER_ROUTE)
             {
@@ -132,7 +133,7 @@ namespace ReforgedNet.LL
                 {
                     // If default route is registered, take that one.
                     // Otherwise search for needed receiver delegate.
-                    if (isDefaultRouteRegistered)
+                    if (netMsg.MessageId != null && isDefaultRouteRegistered)
                     {
                         _defaultReceiverRoute!.Invoke(netMsg);
                     }
@@ -140,8 +141,7 @@ namespace ReforgedNet.LL
                     {
                         for (int i = 0; i < _receiveDelegates.Count; ++i)
                         {
-                            if (_receiveDelegates[i].MessageId < 0 ||
-                               (_receiveDelegates[i].MessageId != null && _receiveDelegates[i].MessageId == netMsg.MessageId))
+                            if (_receiveDelegates[i].MessageId < 0 || _receiveDelegates[i].MessageId == netMsg.MessageId)
                             {
                                 _receiveDelegates[i].ReceiveDelegate.Invoke(netMsg);
                                 break;
@@ -156,9 +156,12 @@ namespace ReforgedNet.LL
         /// Closes socket and releases ressources.
         /// </summary>
         public void Close()
-            => _socket.Close();
+        {
+            _cts.Cancel();
+            _socket?.Close();
+        }
 
-        private async Task SendingTask(CancellationToken cancellationToken)
+        protected async Task SendingTask(CancellationToken cancellationToken)
         {
             DateTime startTime;
             while (!cancellationToken.IsCancellationRequested)
@@ -166,7 +169,7 @@ namespace ReforgedNet.LL
                 // Store start date time of receiving task to calculate an accurate sending delay.
                 startTime = DateTime.Now;
 
-                if (!_outgoingMsgQueue.IsEmpty)
+                if (_socket != null && !_outgoingMsgQueue.IsEmpty)
                 {
                     if (_outgoingMsgQueue.TryDequeue(out RNetMessage netMsg))
                     {
@@ -176,7 +179,12 @@ namespace ReforgedNet.LL
 
                         if (numOfSentBytes == 0)
                         {
-                            _logger?.WriteWarning(new LogInfo("Sent empty message. MessageId: " + netMsg.MessageId.ToString()));
+                            _logger?.WriteWarning(new LogInfo("Sent empty message. MessageId: " + netMsg.MessageId?.ToString()));
+                        }
+                        else
+                        {
+                            //Start receiving...
+                            this.StartReceiverTask();
                         }
 
                         if (netMsg.QoSType == RQoSType.Realiable)
@@ -235,23 +243,39 @@ namespace ReforgedNet.LL
             }
         }
 
-        private void ReceivingTask(CancellationToken cancellationToken)
+        protected async Task ReceivingTask(CancellationToken cancellationToken)
         {
+            if (_socket == null)
+            {
+                await Task.Delay(10);
+            }
             while (!cancellationToken.IsCancellationRequested)
             {
                 var data = new byte[4096];
 
-                var numOfReceivedBytes = _socket.ReceiveFrom(data, 0, 4096, SocketFlags.None, ref _receiveEndPoint);
+                var numOfReceivedBytes = _socket.ReceiveFrom(data, 0, 4096, SocketFlags.None, ref RemoteEndPoint);
 
                 if (numOfReceivedBytes > 0)
                 {
                     if (_serializer.IsRequest(data))
                     {
-                        _incomingMsgQueue.Enqueue(_serializer.Deserialize(data, _receiveEndPoint));
+                        try
+                        {
+                            RNetMessage msg = _serializer.Deserialize(data, RemoteEndPoint);
+                            _incomingMsgQueue.Enqueue(msg);
+                        }
+                        catch(Exception x)
+                        {
+#if DEBUG 
+                            throw x;
+#elif RELEASE
+                            _logger?.WriteError(new LogInfo(x.Message));
+#endif
+                        }
                     }
                     else if (_serializer.IsMessageACK(data))
                     {
-                        var ackMsg = _serializer.DeserializeACKMessage(data, _receiveEndPoint);
+                        var ackMsg = _serializer.DeserializeACKMessage(data, RemoteEndPoint);
                         if (!RemoveSentMessageFromUnacknowledgedMsgQueue(ackMsg))
                         {
                             var errorMsg = "Can't remove non existing network message from unacknowledged message list. MessageId: " + ackMsg.MessageId + " TransactionId: " + ackMsg.TransactionId;
@@ -275,9 +299,30 @@ namespace ReforgedNet.LL
         /// </summary>
         /// <param name="ackMsg"></param>
         /// <returns></returns>
-        private bool RemoveSentMessageFromUnacknowledgedMsgQueue(RReliableNetMessageACK ackMsg)
+        protected bool RemoveSentMessageFromUnacknowledgedMsgQueue(RReliableNetMessageACK ackMsg)
         {
             return _sentUnacknowledgedMessages.Remove(ackMsg.TransactionId, out SentUnacknowledgedMessage msg);
+        }
+
+        /// <summary>
+        /// Creates Socket-Object
+        /// </summary>
+        protected void CreateSocket()
+        {
+            _socket = new Socket(this.RemoteEndPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+            _socket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.IPv6Only, false);
+        }
+
+        /// <summary>
+        /// Starts Receiver-Task
+        /// </summary>
+        protected void StartReceiverTask()
+        {
+            if (_recvTask == null)
+            {
+                _recvTask = Task.Factory.StartNew(() => ReceivingTask(_cts.Token), _cts.Token);
+                _recvTask.ConfigureAwait(false);
+            }
         }
     }
 }
