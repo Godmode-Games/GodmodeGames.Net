@@ -21,8 +21,6 @@ namespace ReforgedNet.Client
                 client.Socket.Dispatch();
                 await Task.Delay(100);
             }
-
-            client.Socket.Close();
         }
     }
 }

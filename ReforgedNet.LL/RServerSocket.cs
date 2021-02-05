@@ -10,11 +10,11 @@ namespace ReforgedNet.LL
     public class RServerSocket : RSocket
     {
         #region Events
-        public delegate void NewClientConnectionHandler(EndPoint ep);
-        public event NewClientConnectionHandler? NewClientConnection;
+        public delegate void ClientDiscoverMessageHandler(EndPoint ep);
+        public event ClientDiscoverMessageHandler? ClientDiscoverMessage = null;
 
-        public delegate void CloseClientConnectionHandler(EndPoint ep);
-        public event CloseClientConnectionHandler? CloseClientConnection;
+        public delegate void ClientDisconnectMessageHandler(EndPoint ep);
+        public event ClientDisconnectMessageHandler? ClientDisconnectMessage = null;
         #endregion
         public RServerSocket(RSocketSettings settings, IPEndPoint remoteEndPoint, IPacketSerializer serializer, ILogger? logger) : base(settings, remoteEndPoint, serializer, logger)
         {
@@ -58,17 +58,17 @@ namespace ReforgedNet.LL
             if (type.Equals("disconnect"))
             {
                 _logger?.WriteInfo(new LogInfo("Connection closed from " + message.RemoteEndPoint.ToString()));
-                if (CloseClientConnection != null)
+                if (ClientDisconnectMessage != null)
                 {
-                    CloseClientConnection(message.RemoteEndPoint);
+                    ClientDisconnectMessage(message.RemoteEndPoint);
                 }
             }
             else
             {
                 _logger?.WriteInfo(new LogInfo("Incomming connection from " + message.RemoteEndPoint.ToString()));
-                if (NewClientConnection != null)
+                if (ClientDiscoverMessage != null)
                 {
-                    NewClientConnection(message.RemoteEndPoint);
+                    ClientDiscoverMessage(message.RemoteEndPoint);
                 }
             }
         }

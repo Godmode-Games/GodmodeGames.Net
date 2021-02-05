@@ -20,14 +20,20 @@ namespace ReforgedNet.Client
         public void Connect()
         {
             var settings = new RSocketSettings();
-            var remoteEndPoint = new IPEndPoint(IPAddress.Loopback, 7000);
+            var remoteEndPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 7000);
             var cancellationToken = new CancellationTokenSource();
 
-            Socket = new RClientSocket(settings, new RJsonSerialization(), null);
+            Socket = new RClientSocket(settings, new RByteSerialization(), null);
 
             Socket.ConnectionSuccessful += OnConnectSuccessful;
+            Socket.ConnectionFailed += OnConnectFailed;
             Socket.Connect(remoteEndPoint);
             Console.WriteLine("Client started.");
+        }
+
+        private void OnConnectFailed()
+        {
+            Console.WriteLine("Connection to server failed!");
         }
 
         private void OnConnectSuccessful()
@@ -40,15 +46,16 @@ namespace ReforgedNet.Client
                 Socket.Disconnect();
             });
 
-            Console.WriteLine("Connected...");
+            Console.WriteLine("Connection to server successful.");
 
             var data = ASCIIEncoding.UTF8.GetBytes("hello-server!");
-            Socket.Send(RSocket.DEFAULT_RECEIVER_ROUTE, ref data, Socket.RemoteEndPoint);
+            Socket.Send(RSocket.DEFAULT_RECEIVER_ROUTE, ref data, Socket.RemoteEndPoint, RQoSType.Realiable);
         }
 
         private void OnDisconnect()
         {
             Console.WriteLine("Connection closed");
+            Socket.Close();
         }
     }
 }

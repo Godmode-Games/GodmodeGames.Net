@@ -20,8 +20,8 @@ namespace ReforgedNet.LL
         public event DisconnectHandler? Disconnected;
         #endregion
 
-        private int DiscoverTransaction = -1;
-        private int DisconnectTransation = -1;
+        private int? DiscoverTransaction = null;
+        private int? DisconnectTransation = null;
         public bool Connected = false;
 
         public RClientSocket(RSocketSettings settings, IPacketSerializer serializer, ILogger? logger) : base(settings, new IPEndPoint(IPAddress.Any, 0), serializer, logger)
@@ -40,6 +40,9 @@ namespace ReforgedNet.LL
             _sendTask = Task.Factory.StartNew(() => SendingTask(_cts.Token), _cts.Token);
             _sendTask.ConfigureAwait(false);
 
+            Connected = false;
+            RegisterReceiver(null, OnDiscoverMessage);
+
             SendHello();
         }
 
@@ -48,10 +51,7 @@ namespace ReforgedNet.LL
         /// </summary>
         public void Disconnect()
         {
-            if (Connected)
-            {
-                SendDisconnect();
-            }
+            SendDisconnect();
         }
 
         /// <summary>
@@ -60,12 +60,25 @@ namespace ReforgedNet.LL
         private void SendHello()
         {
             //Send discover message
-            DiscoverTransaction = RTransactionGenerator.GenerateId();
+            if (DiscoverTransaction == null)
+            {
+                DiscoverTransaction = RTransactionGenerator.GenerateId();
+            }
 
-            RNetMessage discover = new RNetMessage(null, Encoding.UTF8.GetBytes("discover"), DiscoverTransaction, RemoteEndPoint, RQoSType.Realiable);
-
-            RegisterReceiver(null, OnDiscoverMessage);
+            RNetMessage discover = new RNetMessage(null, Encoding.UTF8.GetBytes("discover"), DiscoverTransaction, RemoteEndPoint, RQoSType.Realiable, OnConnetionFailed);
             _outgoingMsgQueue.Enqueue(discover);
+        }
+
+        /// <summary>
+        /// Sending Discover-Message failed
+        /// </summary>
+        private void OnConnetionFailed()
+        {
+            Connected = false;
+            if (ConnectionFailed != null)
+            {
+                ConnectionFailed();
+            }
         }
 
         /// <summary>
@@ -74,34 +87,36 @@ namespace ReforgedNet.LL
         /// <param name="message"></param>
         private void OnDiscoverMessage(RNetMessage message)
         {
-            string type = "discover";
-            try
-            {
-                type = Encoding.UTF8.GetString(message.Data);
-            }
-            catch
-            {
+            if ((DisconnectTransation != null && message.TransactionId.Equals(DisconnectTransation))
+                || (DiscoverTransaction != null && message.TransactionId.Equals(DiscoverTransaction)))
+            { 
+                string type = "discover";
+                try
+                {
+                    type = Encoding.UTF8.GetString(message.Data);
+                }
+                catch
+                {
+                    //Encoding error
+                    return;
+                }
 
-            }
-
-            if (type.Equals("disconnect"))
-            {
-                if (message.TransactionId.Equals(DisconnectTransation))
+                if (type.Equals("disconnect") && Connected)
                 {
                     _logger?.WriteInfo(new LogInfo("Disconnect successful"));
-                    this.Connected = false;
+                    Connected = false;
+                    DisconnectTransation = null;
+
                     if (Disconnected != null)
                     {
                         Disconnected();
                     }
                 }
-            }
-            else
-            {
-                if (message.TransactionId.Equals(DiscoverTransaction))
+                else if (!Connected)
                 {
                     _logger?.WriteInfo(new LogInfo("Connection successful"));
-                    this.Connected = true;
+                    Connected = true;
+                    DiscoverTransaction = null;
                     if (ConnectionSuccessful != null)
                     {
                         ConnectionSuccessful();
@@ -115,11 +130,28 @@ namespace ReforgedNet.LL
         /// </summary>
         private void SendDisconnect()
         {
-            DisconnectTransation = RTransactionGenerator.GenerateId();
+            if (DisconnectTransation == null)
+            {
+                DisconnectTransation = RTransactionGenerator.GenerateId();
+            }
 
-            RNetMessage disc = new RNetMessage(null, Encoding.UTF8.GetBytes("disconnect"), DisconnectTransation, RemoteEndPoint, RQoSType.Realiable);
-            RegisterReceiver(null, OnDiscoverMessage);
+            RNetMessage disc = new RNetMessage(null, Encoding.UTF8.GetBytes("disconnect"), DisconnectTransation, RemoteEndPoint, RQoSType.Realiable, OnDisconnectFailed);
+            //RegisterReceiver(null, OnDiscoverMessage); --> registered at connect
             _outgoingMsgQueue.Enqueue(disc);
+        }
+
+        /// <summary>
+        /// Disconnect failed, never the less disconnect
+        /// </summary>
+        private void OnDisconnectFailed()
+        {
+            _logger?.WriteInfo(new LogInfo("Disconnect failed, cancel connection anyways"));
+            Connected = false;
+            DisconnectTransation = null;
+            if (Disconnected != null)
+            {
+                Disconnected();
+            }
         }
     }
 }

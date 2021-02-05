@@ -23,10 +23,10 @@ namespace ReforgedNet.Server
             var remoteEndPoint = new IPEndPoint(IPAddress.Any, 7000);
             var cancellationToken = new CancellationTokenSource();
 
-            Socket = new RServerSocket(settings, remoteEndPoint, new RJsonSerialization(), null);
+            Socket = new RServerSocket(settings, remoteEndPoint, new RByteSerialization(), null);
 
-            Socket.NewClientConnection += OnNewClient;
-            Socket.CloseClientConnection += OnCloseClient;
+            Socket.ClientDiscoverMessage += OnNewClient;
+            Socket.ClientDisconnectMessage += OnCloseClient;
             Socket.StartListen();
             Console.WriteLine("Server started.");
 

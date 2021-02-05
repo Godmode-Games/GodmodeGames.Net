@@ -4,9 +4,9 @@ using System.Text;
 
 namespace ReforgedNet.LL
 {
-    public enum RQoSType
+    public enum RQoSType : int
     {
-        Unrealiable,
+        Unrealiable = 0,
         Realiable,
     }
 }

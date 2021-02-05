@@ -11,12 +11,14 @@ namespace ReforgedNet.LL.Internal
         internal readonly EndPoint RemoteEndPoint;
         internal DateTime NextRetryTime { get; set; }
         internal int RetriedTimes { get; set; }
+        internal Action? FailedCallback = null;
 
-        public SentUnacknowledgedMessage(byte[] sentData, EndPoint remoteEndPoint, DateTime nextRetryTime)
+        public SentUnacknowledgedMessage(byte[] sentData, EndPoint remoteEndPoint, DateTime nextRetryTime, Action? failCallback = null)
         {
             SentData = sentData;
             RemoteEndPoint = remoteEndPoint;
             NextRetryTime = nextRetryTime;
+            FailedCallback = failCallback;
         }
     }
 }
