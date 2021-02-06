@@ -18,7 +18,7 @@ namespace ReforgedNet.LL.Serialization
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public RNetMessage Deserialize(byte[] data, EndPoint remoteEndPoint);
+        public RNetMessage? Deserialize(byte[] data, EndPoint remoteEndPoint);
         /// <summary>
         /// Returns true if given byte array is a request.
         /// </summary>
@@ -42,6 +42,6 @@ namespace ReforgedNet.LL.Serialization
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public RReliableNetMessageACK DeserializeACKMessage(byte[] data, EndPoint remoteEndPoint);
+        public RReliableNetMessageACK? DeserializeACKMessage(byte[] data, EndPoint remoteEndPoint);
     }
 }

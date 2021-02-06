@@ -197,8 +197,7 @@ namespace ReforgedNet.LL
                     while (_outgoingMsgQueue.TryDequeue(out RNetMessage netMsg))
                     {
                         byte[] data = _serializer.Serialize(netMsg);
-                        int numOfSentBytes = await _socket.SendToAsync(data, SocketFlags.None, netMsg.RemoteEndPoint);
-
+                        int numOfSentBytes = _socket.SendTo(data, 0, data.Length, SocketFlags.None, netMsg.RemoteEndPoint);
 
                         //int numOfSentBytes = await _socket.SendToAsync(data, SocketFlags.None, netMsg.RemoteEndPoint);
 
@@ -228,7 +227,7 @@ namespace ReforgedNet.LL
                     {
                         if (unAckMsg.Value.NextRetryTime < DateTime.Now)
                         {
-                            int numOfSentBytes = await _socket.SendToAsync(unAckMsg.Value.SentData, SocketFlags.None, unAckMsg.Value.RemoteEndPoint);
+                            int numOfSentBytes = _socket.SendTo(unAckMsg.Value.SentData, 0, unAckMsg.Value.SentData.Length, SocketFlags.None, unAckMsg.Value.RemoteEndPoint);
 
                             if (numOfSentBytes != unAckMsg.Value.SentData.Length)
                             {
@@ -245,7 +244,7 @@ namespace ReforgedNet.LL
 
                             if (++unAckMsg.Value.RetriedTimes > _settings.NumberOfSendRetries)
                             {
-                                _sentUnacknowledgedMessages.Remove(unAckMsg.Key, out _);
+                                _sentUnacknowledgedMessages.TryRemove(unAckMsg.Key, out _);
 
                                 //Execute Fail-Callback
                                 if (unAckMsg.Value.FailedCallback != null)
@@ -258,8 +257,8 @@ namespace ReforgedNet.LL
                                 throw new Exception(errorMsg);
 #elif RELEASE
                                 _logger?.WriteError(new LogInfo(errorMsg));
-#endif
                                 continue;
+#endif
                             }
                                     
                             unAckMsg.Value.NextRetryTime = DateTime.Now.AddMilliseconds(_settings.SendRetryDelay);
@@ -274,7 +273,7 @@ namespace ReforgedNet.LL
                         //byte[] data = _serializer.SerializeACKMessage(ackMsg);
 
                         byte[] data = _serializer.SerializeACKMessage(ackMsg);
-                        int numOfSentBytes = await _socket.SendToAsync(data, SocketFlags.None, ackMsg.RemoteEndPoint);
+                        int numOfSentBytes = _socket.SendTo(data, 0, data.Length, SocketFlags.None, ackMsg.RemoteEndPoint);
 
                         if (numOfSentBytes == 0)
                         {
@@ -297,20 +296,20 @@ namespace ReforgedNet.LL
             }
         }
 
-        protected async Task ReceivingTask(CancellationToken cancellationToken)
+        protected void ReceivingTask(CancellationToken cancellationToken)
         {
             while (!cancellationToken.IsCancellationRequested)
             {
                 var data = new byte[4096];
 
-                var numOfReceivedBytes = _socket.ReceiveFrom(data, 0, 4096, SocketFlags.None, ref RemoteEndPoint);
+                var numOfReceivedBytes = _socket!.ReceiveFrom(data, 0, 4096, SocketFlags.None, ref RemoteEndPoint);
 
                 if (numOfReceivedBytes > 0)
                 {
                     UpdateReceiveStatistics(numOfReceivedBytes);
                     if (_serializer.IsRequest(data))
                     {
-                        RNetMessage msg = _serializer.Deserialize(data, RemoteEndPoint);
+                        RNetMessage? msg = _serializer.Deserialize(data, RemoteEndPoint);
                         if (msg == null)
                         {
 #if DEBUG
@@ -324,7 +323,9 @@ namespace ReforgedNet.LL
                             _incomingMsgQueue.Enqueue(msg);
                             if (msg.QoSType == RQoSType.Realiable)
                             {
+#pragma warning disable CS8629 // Nullable value type may be null.
                                 _pendingACKMessages.Enqueue(new RReliableNetMessageACK(msg.MessageId, (int)msg.TransactionId, msg.RemoteEndPoint));
+#pragma warning restore CS8629 // Nullable value type may be null.
                             }
                         }
                     }
@@ -336,7 +337,7 @@ namespace ReforgedNet.LL
 #if DEBUG
                             throw new Exception("Serializing of ACKRNetMessage failed!");
 #elif RELEASE
-                        _logger?.WriteError(new LogInfo("Serializing of ACKRNetMessage failed!"));
+                            _logger?.WriteError(new LogInfo("Serializing of ACKRNetMessage failed!"));
 #endif
                         }
                         if (!RemoveSentMessageFromUnacknowledgedMsgQueue(ackMsg))
@@ -364,7 +365,7 @@ namespace ReforgedNet.LL
         /// <returns></returns>
         protected bool RemoveSentMessageFromUnacknowledgedMsgQueue(RReliableNetMessageACK ackMsg)
         {
-            return _sentUnacknowledgedMessages.Remove(ackMsg.TransactionId, out SentUnacknowledgedMessage msg);
+            return _sentUnacknowledgedMessages.TryRemove(ackMsg.TransactionId, out SentUnacknowledgedMessage msg);
         }
 
         /// <summary>
