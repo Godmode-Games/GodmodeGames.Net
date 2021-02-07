@@ -9,25 +9,16 @@ namespace ReforgedNet.LL
 {
     public class RClientSocket : RSocket
     {
-        #region Events
-        public delegate void ConnectionSuccessHandler();
-        public event ConnectionSuccessHandler? ConnectionSuccessful;
-
-        public delegate void ConnectionFailedHandler();
-        public event ConnectionFailedHandler? ConnectionFailed;
-
-        public delegate void DisconnectHandler();
-        public event DisconnectHandler? Disconnected;
-        #endregion
+        public Action? Connected;
+        public Action? Disconnected;
+        public Action? Error;
 
         private int? DiscoverTransaction = null;
         private int? DisconnectTransation = null;
-        public bool Connected = false;
+        public bool IsConnected { get; private set; } = false;
 
-        public RClientSocket(RSocketSettings settings, IPacketSerializer serializer, ILogger? logger) : base(settings, new IPEndPoint(IPAddress.Any, 0), serializer, logger)
-        {
-            this.Connected = false;
-        }
+        public RClientSocket(RSocketSettings settings, IPacketSerializer serializer, ILogger? logger)
+            : base(settings, new IPEndPoint(IPAddress.Any, 0), serializer, logger) { }
 
         /// <summary>
         /// Connecting to specified endpoint
@@ -40,7 +31,6 @@ namespace ReforgedNet.LL
             _sendTask = Task.Factory.StartNew(() => SendingTask(_cts.Token), _cts.Token);
             _sendTask.ConfigureAwait(false);
 
-            Connected = false;
             RegisterReceiver(null, OnDiscoverMessage);
 
             SendHello();
@@ -74,11 +64,8 @@ namespace ReforgedNet.LL
         /// </summary>
         private void OnConnetionFailed()
         {
-            Connected = false;
-            if (ConnectionFailed != null)
-            {
-                ConnectionFailed();
-            }
+            IsConnected = false;
+            Connected?.Invoke();
         }
 
         /// <summary>
@@ -101,26 +88,21 @@ namespace ReforgedNet.LL
                     return;
                 }
 
-                if (type.Equals("disconnect") && Connected)
+                if (type.Equals("disconnect") && IsConnected)
                 {
                     _logger?.WriteInfo(new LogInfo("Disconnect successful"));
-                    Connected = false;
+                    IsConnected = false;
                     DisconnectTransation = null;
 
-                    if (Disconnected != null)
-                    {
-                        Disconnected();
-                    }
+                    Disconnected?.Invoke();
                 }
-                else if (!Connected)
+                else if (!IsConnected)
                 {
                     _logger?.WriteInfo(new LogInfo("Connection successful"));
-                    Connected = true;
+                    IsConnected = true;
                     DiscoverTransaction = null;
-                    if (ConnectionSuccessful != null)
-                    {
-                        ConnectionSuccessful();
-                    }
+
+                    Connected?.Invoke();
                 }
             }
         }
@@ -146,12 +128,10 @@ namespace ReforgedNet.LL
         private void OnDisconnectFailed()
         {
             _logger?.WriteInfo(new LogInfo("Disconnect failed, cancel connection anyways"));
-            Connected = false;
+            IsConnected = false;
             DisconnectTransation = null;
-            if (Disconnected != null)
-            {
-                Disconnected();
-            }
+
+            Disconnected?.Invoke();
         }
     }
 }
