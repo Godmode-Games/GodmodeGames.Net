@@ -20,16 +20,14 @@ namespace ReforgedNet.LL
         public readonly int? TransactionId;
         public readonly EndPoint RemoteEndPoint;
         public readonly RQoSType QoSType;
-        public readonly Action? FailedCallback = null;
 
-        public RNetMessage(int? messageId, byte[] data, int? transactionId, EndPoint remoteEP, RQoSType qosType = RQoSType.Unrealiable, Action? failCallback = null)
+        public RNetMessage(int? messageId, byte[] data, int? transactionId, EndPoint remoteEP, RQoSType qosType = RQoSType.Unrealiable)
         {
             MessageId = messageId;
             Data = data;
             TransactionId = transactionId;
             RemoteEndPoint = remoteEP;
             QoSType = qosType;
-            FailedCallback = failCallback;
         }
 
         public bool Equals(RNetMessage other)

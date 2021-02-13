@@ -18,6 +18,9 @@ namespace ReforgedNet.LL
     {
         public const int DEFAULT_RECEIVER_ROUTE = int.MinValue;
 
+        /// <summary>Gets invoked if an internal error occurs.</summary>
+        public Action? Error;
+
         /// <summary>Queue for outgoing messages.</summary>
         protected readonly ConcurrentQueue<RNetMessage> _outgoingMsgQueue
             = new ConcurrentQueue<RNetMessage>();
@@ -93,7 +96,7 @@ namespace ReforgedNet.LL
         public void Send(int messageId, ref byte[] data, EndPoint remoteEndPoint, RQoSType qosType = RQoSType.Unrealiable, Action? failCallback = null)
         {
             var message = (qosType == RQoSType.Realiable) ?
-                new RNetMessage(messageId, data, RTransactionGenerator.GenerateId(), remoteEndPoint, qosType, failCallback) :
+                new RNetMessage(messageId, data, RTransactionGenerator.GenerateId(), remoteEndPoint, qosType) :
                 new RNetMessage(messageId, data, null, remoteEndPoint, qosType);
 
             _outgoingMsgQueue.Enqueue(message);
@@ -216,7 +219,7 @@ namespace ReforgedNet.LL
 
                         if (netMsg.QoSType == RQoSType.Realiable)
                         {
-                            _sentUnacknowledgedMessages.TryAdd(netMsg.TransactionId!.Value, new SentUnacknowledgedMessage(data, netMsg.RemoteEndPoint, DateTime.Now.AddMilliseconds(_settings.SendRetryDelay), netMsg.FailedCallback));
+                            _sentUnacknowledgedMessages.TryAdd(netMsg.TransactionId!.Value, new SentUnacknowledgedMessage(data, netMsg.RemoteEndPoint, DateTime.Now.AddMilliseconds(_settings.SendRetryDelay)));
                         }
                     }
                 }
@@ -233,11 +236,8 @@ namespace ReforgedNet.LL
                             {
                                 // Number of sent bytes unequal to message size.
                                 var errorMsg = "Number of sent bytes unequal to message size. RemoteEndPoint: " + unAckMsg.Value.RemoteEndPoint;
-#if DEBUG
-                                throw new Exception(errorMsg);
-#elif RELEASE
                                 _logger?.WriteError(new LogInfo(errorMsg));
-#endif
+                                Error?.Invoke();
                             }
 
                             UpdateSendStatistics(numOfSentBytes);
@@ -246,19 +246,10 @@ namespace ReforgedNet.LL
                             {
                                 _sentUnacknowledgedMessages.TryRemove(unAckMsg.Key, out _);
 
-                                //Execute Fail-Callback
-                                if (unAckMsg.Value.FailedCallback != null)
-                                {
-                                    unAckMsg.Value.FailedCallback();
-                                }
-
                                 var errorMsg = "Number of max retries reached. RemoteEndPoint: " + unAckMsg.Value.RemoteEndPoint;
-#if DEBUG
-                                throw new Exception(errorMsg);
-#elif RELEASE
                                 _logger?.WriteError(new LogInfo(errorMsg));
+                                Error?.Invoke();
                                 continue;
-#endif
                             }
                                     
                             unAckMsg.Value.NextRetryTime = DateTime.Now.AddMilliseconds(_settings.SendRetryDelay);

@@ -11,7 +11,6 @@ namespace ReforgedNet.LL
     {
         public Action? Connected;
         public Action? Disconnected;
-        public Action? Error;
 
         private int? DiscoverTransaction = null;
         private int? DisconnectTransation = null;
@@ -55,7 +54,7 @@ namespace ReforgedNet.LL
                 DiscoverTransaction = RTransactionGenerator.GenerateId();
             }
 
-            RNetMessage discover = new RNetMessage(null, Encoding.UTF8.GetBytes("discover"), DiscoverTransaction, RemoteEndPoint, RQoSType.Realiable, OnConnetionFailed);
+            RNetMessage discover = new RNetMessage(null, Encoding.UTF8.GetBytes("discover"), DiscoverTransaction, RemoteEndPoint, RQoSType.Realiable);
             _outgoingMsgQueue.Enqueue(discover);
         }
 
@@ -117,7 +116,7 @@ namespace ReforgedNet.LL
                 DisconnectTransation = RTransactionGenerator.GenerateId();
             }
 
-            RNetMessage disc = new RNetMessage(null, Encoding.UTF8.GetBytes("disconnect"), DisconnectTransation, RemoteEndPoint, RQoSType.Realiable, OnDisconnectFailed);
+            RNetMessage disc = new RNetMessage(null, Encoding.UTF8.GetBytes("disconnect"), DisconnectTransation, RemoteEndPoint, RQoSType.Realiable);
             //RegisterReceiver(null, OnDiscoverMessage); --> registered at connect
             _outgoingMsgQueue.Enqueue(disc);
         }
