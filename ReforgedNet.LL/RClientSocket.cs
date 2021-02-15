@@ -11,6 +11,7 @@ namespace ReforgedNet.LL
     {
         public Action? Connected;
         public Action? Disconnected;
+        public Action? ConnectFailed;
 
         private int? DiscoverTransaction = null;
         private int? DisconnectTransation = null;
@@ -31,8 +32,20 @@ namespace ReforgedNet.LL
             _sendTask.ConfigureAwait(false);
 
             RegisterReceiver(null, OnDiscoverMessage);
-
             SendHello();
+        }
+
+        /// <summary>
+        /// Login failed
+        /// </summary>
+        /// <param name="tid"></param>
+        private void OnError(int tid)
+        {
+            if (tid == DiscoverTransaction)
+            {
+                IsConnected = false;
+                ConnectFailed?.Invoke();
+            }
         }
 
         /// <summary>
@@ -54,17 +67,10 @@ namespace ReforgedNet.LL
                 DiscoverTransaction = RTransactionGenerator.GenerateId();
             }
 
+            Error += OnError;
+
             RNetMessage discover = new RNetMessage(null, Encoding.UTF8.GetBytes("discover"), DiscoverTransaction, RemoteEndPoint, RQoSType.Realiable);
             _outgoingMsgQueue.Enqueue(discover);
-        }
-
-        /// <summary>
-        /// Sending Discover-Message failed
-        /// </summary>
-        private void OnConnetionFailed()
-        {
-            IsConnected = false;
-            Connected?.Invoke();
         }
 
         /// <summary>
@@ -116,21 +122,24 @@ namespace ReforgedNet.LL
                 DisconnectTransation = RTransactionGenerator.GenerateId();
             }
 
+            Error += OnDisconnectFailed;
             RNetMessage disc = new RNetMessage(null, Encoding.UTF8.GetBytes("disconnect"), DisconnectTransation, RemoteEndPoint, RQoSType.Realiable);
-            //RegisterReceiver(null, OnDiscoverMessage); --> registered at connect
             _outgoingMsgQueue.Enqueue(disc);
         }
 
         /// <summary>
         /// Disconnect failed, never the less disconnect
         /// </summary>
-        private void OnDisconnectFailed()
+        private void OnDisconnectFailed(int tid)
         {
-            _logger?.WriteInfo(new LogInfo("Disconnect failed, cancel connection anyways"));
-            IsConnected = false;
-            DisconnectTransation = null;
+            if (tid == DisconnectTransation)
+            {
+                _logger?.WriteInfo(new LogInfo("Disconnect failed, cancel connection anyways"));
+                IsConnected = false;
+                DisconnectTransation = null;
 
-            Disconnected?.Invoke();
+                Disconnected?.Invoke();
+            }
         }
     }
 }

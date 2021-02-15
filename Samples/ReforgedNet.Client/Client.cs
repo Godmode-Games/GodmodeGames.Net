@@ -26,12 +26,12 @@ namespace ReforgedNet.Client
             Socket = new RClientSocket(settings, new RByteSerialization(), null);
 
             Socket.Connected += OnConnectSuccessful;
-            Socket.Disconnected += OnConnectFailed;
+            Socket.Error += OnConnectFailed;
             Socket.Connect(remoteEndPoint);
             Console.WriteLine("Client started.");
         }
 
-        private void OnConnectFailed()
+        private void OnConnectFailed(int tid)
         {
             Console.WriteLine("Connection to server failed!");
         }

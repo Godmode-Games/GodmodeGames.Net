@@ -19,7 +19,7 @@ namespace ReforgedNet.LL
         public const int DEFAULT_RECEIVER_ROUTE = int.MinValue;
 
         /// <summary>Gets invoked if an internal error occurs.</summary>
-        public Action? Error;
+        public Action<int>? Error;
 
         /// <summary>Queue for outgoing messages.</summary>
         protected readonly ConcurrentQueue<RNetMessage> _outgoingMsgQueue
@@ -202,8 +202,6 @@ namespace ReforgedNet.LL
                         byte[] data = _serializer.Serialize(netMsg);
                         int numOfSentBytes = _socket.SendTo(data, 0, data.Length, SocketFlags.None, netMsg.RemoteEndPoint);
 
-                        //int numOfSentBytes = await _socket.SendToAsync(data, SocketFlags.None, netMsg.RemoteEndPoint);
-
                         if (numOfSentBytes == 0)
                         {
                             _logger?.WriteWarning(new LogInfo("Sent empty message. MessageId: " + netMsg.MessageId?.ToString()));
@@ -219,7 +217,7 @@ namespace ReforgedNet.LL
 
                         if (netMsg.QoSType == RQoSType.Realiable)
                         {
-                            _sentUnacknowledgedMessages.TryAdd(netMsg.TransactionId!.Value, new SentUnacknowledgedMessage(data, netMsg.RemoteEndPoint, DateTime.Now.AddMilliseconds(_settings.SendRetryDelay)));
+                            _sentUnacknowledgedMessages.TryAdd(netMsg.TransactionId!.Value, new SentUnacknowledgedMessage(data, netMsg.RemoteEndPoint, DateTime.Now.AddMilliseconds(_settings.SendRetryDelay), netMsg.TransactionId.Value));
                         }
                     }
                 }
@@ -237,7 +235,12 @@ namespace ReforgedNet.LL
                                 // Number of sent bytes unequal to message size.
                                 var errorMsg = "Number of sent bytes unequal to message size. RemoteEndPoint: " + unAckMsg.Value.RemoteEndPoint;
                                 _logger?.WriteError(new LogInfo(errorMsg));
-                                Error?.Invoke();
+                                Error?.Invoke(unAckMsg.Value.TransactionId);
+                            }
+                            else if (numOfSentBytes > 0)
+                            {
+                                //Start receiving...
+                                this.StartReceiverTask();
                             }
 
                             UpdateSendStatistics(numOfSentBytes);
@@ -248,7 +251,7 @@ namespace ReforgedNet.LL
 
                                 var errorMsg = "Number of max retries reached. RemoteEndPoint: " + unAckMsg.Value.RemoteEndPoint;
                                 _logger?.WriteError(new LogInfo(errorMsg));
-                                Error?.Invoke();
+                                Error?.Invoke(unAckMsg.Value.TransactionId);
                                 continue;
                             }
                                     
@@ -293,7 +296,15 @@ namespace ReforgedNet.LL
             {
                 var data = new byte[4096];
 
-                var numOfReceivedBytes = _socket!.ReceiveFrom(data, 0, 4096, SocketFlags.None, ref RemoteEndPoint);
+                int numOfReceivedBytes = 0;
+                try
+                {
+                    numOfReceivedBytes = _socket!.ReceiveFrom(data, 0, 4096, SocketFlags.None, ref RemoteEndPoint);
+                }
+                catch
+                {
+                    break;
+                }
 
                 if (numOfReceivedBytes > 0)
                 {

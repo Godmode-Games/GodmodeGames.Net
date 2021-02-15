@@ -37,7 +37,7 @@ namespace ReforgedNet.LL.Serialization
             byte[] rec_data = new byte[data_length];
             Array.Copy(data, readCursor, rec_data, 0, data_length);
 
-            return new RNetMessage(MsgId, rec_data, TransactionId, remoteEndPoint, type, null);
+            return new RNetMessage(MsgId, rec_data, TransactionId, remoteEndPoint, type);
         }
 
         public RReliableNetMessageACK DeserializeACKMessage(byte[] data, EndPoint remoteEndPoint)
