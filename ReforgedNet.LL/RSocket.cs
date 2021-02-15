@@ -33,8 +33,12 @@ namespace ReforgedNet.LL
         protected readonly ConcurrentQueue<RReliableNetMessageACK> _pendingACKMessages = new ConcurrentQueue<RReliableNetMessageACK>();
 
         /// <summary>Registered delegates.</summary>
-        protected IList<ReceiveDelegateDefinition> _receiveDelegates
-            = new List<ReceiveDelegateDefinition>();
+        protected IDictionary<int?, List<ReceiveDelegate>> _receiveDelegates
+            = new Dictionary<int?, List<ReceiveDelegate>>();
+        /// <summary>
+        /// Registered delegates for discover-messages
+        /// </summary>
+        protected List<ReceiveDelegate> _discoverDelegates = new List<ReceiveDelegate>();
 
         protected ReceiveDelegate? _defaultReceiverRoute;
         protected bool isDefaultRouteRegistered = false;
@@ -116,9 +120,35 @@ namespace ReforgedNet.LL
                 return;
             }
 
-            _receiveDelegates.Add(
+            if (messageId == null)
+            {
+                if (!_discoverDelegates.Contains(@delegate))
+                {
+                    _discoverDelegates.Add(@delegate);
+                }
+                return;
+            }
+
+            int mid = messageId.Value;
+
+            if (_receiveDelegates.ContainsKey(mid) && _receiveDelegates[mid].Contains(@delegate))
+            {
+                //Already registered
+                return;
+            }
+            else
+            {
+
+                if (!_receiveDelegates.ContainsKey(mid))
+                {
+                    _receiveDelegates.Add(mid, new List<ReceiveDelegate>());
+                }
+                _receiveDelegates[mid].Add(@delegate);
+            }
+
+            /*_receiveDelegates.Add(
                 new ReceiveDelegateDefinition(messageId, @delegate)
-            );
+            );*/
         }
 
         /// <summary>
@@ -126,7 +156,7 @@ namespace ReforgedNet.LL
         /// This function is not threadsafe and should only gets called from dispatcher thread.
         /// </summary>
         /// <param name="messageId"></param>
-        public void UnregisterReceiver(int messageId)
+        public void UnregisterReceiver(int? messageId, ReceiveDelegate @delegate)
         {
             if (messageId == DEFAULT_RECEIVER_ROUTE)
             {
@@ -135,16 +165,26 @@ namespace ReforgedNet.LL
                 return;
             }
 
-            int index = 0;
-            for (index = 0; index < _receiveDelegates.Count; ++index)
+            if (messageId == null)
             {
-                if (_receiveDelegates[index].MessageId == messageId)
+                if (_discoverDelegates.Contains(@delegate))
                 {
-                    break;
+                    _discoverDelegates.Remove(@delegate);
                 }
+                return;
             }
 
-            _receiveDelegates.RemoveAt(index);
+            if (_receiveDelegates.ContainsKey(messageId))
+            {
+                for (int i = 0; i < this._receiveDelegates[messageId].Count; i++)
+                {
+                    if (this._receiveDelegates[messageId][i] == @delegate)
+                    {
+                        this._receiveDelegates[messageId].RemoveAt(i);
+                        return;
+                    }
+                }
+            }
         }
 
 
@@ -165,12 +205,23 @@ namespace ReforgedNet.LL
                     }
                     else
                     {
-                        for (int i = 0; i < _receiveDelegates.Count; ++i)
+                        if (netMsg.MessageId == null)
                         {
-                            if (_receiveDelegates[i].MessageId < 0 || _receiveDelegates[i].MessageId == netMsg.MessageId)
+                            //discover messages
+                            for (int i = 0; i < _discoverDelegates.Count; i++)
                             {
-                                _receiveDelegates[i].ReceiveDelegate.Invoke(netMsg);
-                                break;
+                                this._discoverDelegates[i].Invoke(netMsg);
+                            }
+                        }
+                        else
+                        {
+                            int mid = netMsg.MessageId.Value;
+                            if (_receiveDelegates.ContainsKey(mid))
+                            {
+                                for (int i = 0; i < this._receiveDelegates[mid].Count; i++)
+                                {
+                                    this._receiveDelegates[mid][i].Invoke(netMsg);
+                                }
                             }
                         }
                     }
