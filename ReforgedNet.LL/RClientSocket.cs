@@ -39,7 +39,7 @@ namespace ReforgedNet.LL
         /// Login failed
         /// </summary>
         /// <param name="tid"></param>
-        private void OnError(int tid)
+        private void OnDiscoverFailed(int tid)
         {
             if (tid == DiscoverTransaction)
             {
@@ -51,7 +51,7 @@ namespace ReforgedNet.LL
         /// <summary>
         /// Close connection
         /// </summary>
-        public void Disconnect()
+        public void DisconnectAsync()
         {
             SendDisconnect();
         }
@@ -67,7 +67,7 @@ namespace ReforgedNet.LL
                 DiscoverTransaction = RTransactionGenerator.GenerateId();
             }
 
-            Error += OnError;
+            Error += OnDiscoverFailed;
 
             RNetMessage discover = new RNetMessage(null, Encoding.UTF8.GetBytes("discover"), DiscoverTransaction, RemoteEndPoint, RQoSType.Realiable);
             _outgoingMsgQueue.Enqueue(discover);
@@ -79,36 +79,46 @@ namespace ReforgedNet.LL
         /// <param name="message"></param>
         private void OnDiscoverMessage(RNetMessage message)
         {
-            if ((DisconnectTransation != null && message.TransactionId.Equals(DisconnectTransation))
-                || (DiscoverTransaction != null && message.TransactionId.Equals(DiscoverTransaction)))
-            { 
-                string type = "discover";
-                try
-                {
-                    type = Encoding.UTF8.GetString(message.Data);
-                }
-                catch
-                {
-                    //Encoding error
-                    return;
-                }
+            string type = "discover";
+            try
+            {
+                type = Encoding.UTF8.GetString(message.Data);
+            }
+            catch
+            {
+                //Encoding error
+                return;
+            }
 
-                if (type.Equals("disconnect") && IsConnected)
-                {
-                    _logger?.WriteInfo(new LogInfo("Disconnect successful"));
-                    IsConnected = false;
-                    DisconnectTransation = null;
+            if (type.Equals("disconnect_response") && IsConnected && DisconnectTransation == message.TransactionId)
+            {
+                //Disconnect answer from server
+                _logger?.WriteInfo(new LogInfo("Disconnect successful"));
+                IsConnected = false;
+                DisconnectTransation = null;
 
-                    Disconnected?.Invoke();
-                }
-                else if (!IsConnected)
-                {
-                    _logger?.WriteInfo(new LogInfo("Connection successful"));
-                    IsConnected = true;
-                    DiscoverTransaction = null;
+                Disconnected?.Invoke();
+                Error -= OnDisconnectFailed; //Clear all discover-fails
+            }
+            else if (type.Equals("disconnect_request") && IsConnected)
+            {
+                //Server requests a disconnect -> anwser confirm
+                RNetMessage answer = new RNetMessage(null, Encoding.UTF8.GetBytes("disconnect_response"), message.TransactionId, RemoteEndPoint, RQoSType.Realiable);
+                _logger?.WriteInfo(new LogInfo("Disconnect by server"));
 
-                    Connected?.Invoke();
-                }
+                IsConnected = false;
+                DisconnectTransation = null;
+                Disconnected?.Invoke();
+            }
+            else if (type.Equals("discover") && !IsConnected && DiscoverTransaction == message.TransactionId)
+            {
+                //Discover answer from server
+                _logger?.WriteInfo(new LogInfo("Connection successful"));
+                IsConnected = true;
+                DiscoverTransaction = null;
+                Error -= OnDiscoverFailed; //Clear all discover-fails
+
+                Connected?.Invoke();
             }
         }
 
@@ -123,7 +133,7 @@ namespace ReforgedNet.LL
             }
 
             Error += OnDisconnectFailed;
-            RNetMessage disc = new RNetMessage(null, Encoding.UTF8.GetBytes("disconnect"), DisconnectTransation, RemoteEndPoint, RQoSType.Realiable);
+            RNetMessage disc = new RNetMessage(null, Encoding.UTF8.GetBytes("disconnect_request"), DisconnectTransation, RemoteEndPoint, RQoSType.Realiable);
             _outgoingMsgQueue.Enqueue(disc);
         }
 

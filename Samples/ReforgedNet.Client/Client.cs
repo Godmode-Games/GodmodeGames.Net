@@ -43,7 +43,7 @@ namespace ReforgedNet.Client
             {
                 Console.WriteLine($"Received from: {message.RemoteEndPoint}, message:" + ASCIIEncoding.UTF8.GetString(message.Data));
                 Socket.Disconnected += OnDisconnect;
-                Socket.Disconnect();
+                //Socket.DisconnectAsync();
             });
 
             Console.WriteLine("Connection to server successful.");

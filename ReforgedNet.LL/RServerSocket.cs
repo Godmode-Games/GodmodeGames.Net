@@ -9,12 +9,17 @@ namespace ReforgedNet.LL
 {
     public class RServerSocket : RSocket
     {
+        /// <summary>
+        /// Endpoints, that should be disconnected
+        /// </summary>
+        private Dictionary<EndPoint, DateTime> _pendingDisconnects = new Dictionary<EndPoint, DateTime>();
+
         #region Events
         public delegate void ClientDiscoverMessageHandler(EndPoint ep);
         public event ClientDiscoverMessageHandler? ClientDiscoverMessage = null;
 
-        public delegate void ClientDisconnectMessageHandler(EndPoint ep);
-        public event ClientDisconnectMessageHandler? ClientDisconnectMessage = null;
+        public delegate void ClientDisconnectHandler(EndPoint ep);
+        public event ClientDisconnectHandler? ClientDisconnect = null;
         #endregion
         public RServerSocket(RSocketSettings settings, IPEndPoint remoteEndPoint, IPacketSerializer serializer, ILogger? logger) : base(settings, remoteEndPoint, serializer, logger)
         {
@@ -51,24 +56,70 @@ namespace ReforgedNet.LL
             {
 
             }
-            
-            RNetMessage discover = new RNetMessage(null, Encoding.UTF8.GetBytes(type), message.TransactionId, message.RemoteEndPoint, RQoSType.Realiable);
-            _outgoingMsgQueue.Enqueue(discover);
 
-            if (type.Equals("disconnect"))
+            RNetMessage? discover = null;
+
+            if (type.Equals("disconnect_request"))
             {
-                _logger?.WriteInfo(new LogInfo("Connection closed from " + message.RemoteEndPoint.ToString()));
-                if (ClientDisconnectMessage != null)
+                //Client requests disconnect - send response
+                _logger?.WriteInfo(new LogInfo("Connection closed by " + message.RemoteEndPoint.ToString()));
+                discover = new RNetMessage(null, Encoding.UTF8.GetBytes("disconncet_response"), message.TransactionId, message.RemoteEndPoint, RQoSType.Realiable);                
+                ClientDisconnect?.Invoke(message.RemoteEndPoint);
+            }
+            else if (type.Equals("disconnect_response"))
+            {
+                //Client answers for requested disconnect
+                if (_pendingDisconnects.ContainsKey(message.RemoteEndPoint))
                 {
-                    ClientDisconnectMessage(message.RemoteEndPoint);
+                    _logger?.WriteInfo(new LogInfo("Connection to " + message.RemoteEndPoint + " closed by server"));
+                    _pendingDisconnects.Remove(message.RemoteEndPoint);
+                    ClientDisconnect?.Invoke(message.RemoteEndPoint);
                 }
             }
-            else
+            else if (type.Equals("discover"))
             {
                 _logger?.WriteInfo(new LogInfo("Incomming connection from " + message.RemoteEndPoint.ToString()));
-                if (ClientDiscoverMessage != null)
+                ClientDiscoverMessage?.Invoke(message.RemoteEndPoint);
+                discover = new RNetMessage(null, Encoding.UTF8.GetBytes("discover"), message.TransactionId, message.RemoteEndPoint, RQoSType.Realiable);
+            }
+
+            if (discover != null)
+            {
+                _outgoingMsgQueue.Enqueue(discover);
+            }
+        }
+
+        public void DisconnectEndPointAsync(EndPoint ep)
+        {
+            if (!_pendingDisconnects.ContainsKey(ep))
+            {
+                RNetMessage disc = new RNetMessage(null, Encoding.UTF8.GetBytes("disconnect_request"), null, ep, RQoSType.Realiable);
+                _pendingDisconnects.Add(ep, DateTime.Now);
+                _outgoingMsgQueue.Enqueue(disc);
+            }
+        }
+
+        public new void Dispatch()
+        {
+            base.Dispatch();
+
+            //remove pending disconnect while timeout
+            if (_pendingDisconnects.Count > 0)
+            { 
+                List<EndPoint> removeEndPoint = new List<EndPoint>();
+                foreach (KeyValuePair<EndPoint, DateTime> kvp in _pendingDisconnects)
                 {
-                    ClientDiscoverMessage(message.RemoteEndPoint);
+                    if (DateTime.Now.Subtract(kvp.Value).TotalMilliseconds > _settings.PendingDisconnectTimeout)
+                    {
+                        removeEndPoint.Add(kvp.Key);
+                    }
+                }
+
+                foreach (EndPoint ep in removeEndPoint)
+                {
+                    _logger?.WriteInfo(new LogInfo("Disconnect timeout for " + ep.ToString() + " - force disconnect"));
+                    ClientDisconnect?.Invoke(ep);
+                    _pendingDisconnects.Remove(ep);
                 }
             }
         }

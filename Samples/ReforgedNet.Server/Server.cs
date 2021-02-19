@@ -26,7 +26,7 @@ namespace ReforgedNet.Server
             Socket = new RServerSocket(settings, remoteEndPoint, new RByteSerialization(), null);
 
             Socket.ClientDiscoverMessage += OnNewClient;
-            Socket.ClientDisconnectMessage += OnCloseClient;
+            Socket.ClientDisconnect += OnCloseClient;
             Socket.StartListen();
             Console.WriteLine("Server started.");
 
@@ -42,6 +42,8 @@ namespace ReforgedNet.Server
                 Socket.Send(1, ref data, message.RemoteEndPoint);
 
                 Console.WriteLine($"Sent message: {messageString}, to: {message.RemoteEndPoint}");
+
+                this.Socket.DisconnectEndPointAsync(message.RemoteEndPoint);
             });
         }
 
