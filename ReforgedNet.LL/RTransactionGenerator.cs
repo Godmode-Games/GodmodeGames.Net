@@ -13,10 +13,13 @@ namespace ReforgedNet.LL
         /// You could also use your own implementation.
         /// </summary>
         /// <returns></returns>
-        public static int GenerateId()
+        public static long GenerateId()
         {
             // TODO: replace with faster algorithm.
-            return _rnd.Next(int.MinValue, int.MaxValue);
+            byte[] buf = new byte[8];
+            _rnd.NextBytes(buf);
+            long longRand = BitConverter.ToInt64(buf, 0);
+            return (Math.Abs(longRand % long.MaxValue));
         }
     }
 }

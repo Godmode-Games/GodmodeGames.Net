@@ -31,7 +31,7 @@ namespace ReforgedNet.Client
             Console.WriteLine("Client started.");
         }
 
-        private void OnConnectFailed(int tid)
+        private void OnConnectFailed(long tid)
         {
             Console.WriteLine("Connection to server failed!");
         }

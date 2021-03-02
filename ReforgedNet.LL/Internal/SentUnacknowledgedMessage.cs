@@ -11,9 +11,9 @@ namespace ReforgedNet.LL.Internal
         internal readonly EndPoint RemoteEndPoint;
         internal DateTime NextRetryTime { get; set; }
         internal int RetriedTimes { get; set; }
-        internal int TransactionId { get; set; }
+        internal long TransactionId { get; set; }
 
-        public SentUnacknowledgedMessage(byte[] sentData, EndPoint remoteEndPoint, DateTime nextRetryTime, int transactionId)
+        public SentUnacknowledgedMessage(byte[] sentData, EndPoint remoteEndPoint, DateTime nextRetryTime, long transactionId)
         {
             SentData = sentData;
             RemoteEndPoint = remoteEndPoint;

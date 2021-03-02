@@ -17,11 +17,11 @@ namespace ReforgedNet.LL
         /// <summary>Byte array of transmitted content.</summary>
         public readonly byte[] Data;
         /// <summary>Transaction id to identify reliable messages.</summary>
-        public readonly int? TransactionId;
+        public readonly long? TransactionId;
         public readonly EndPoint RemoteEndPoint;
         public readonly RQoSType QoSType;
 
-        public RNetMessage(int? messageId, byte[] data, int? transactionId, EndPoint remoteEP, RQoSType qosType = RQoSType.Unrealiable)
+        public RNetMessage(int? messageId, byte[] data, long? transactionId, EndPoint remoteEP, RQoSType qosType = RQoSType.Unrealiable)
         {
             MessageId = messageId;
             Data = data;

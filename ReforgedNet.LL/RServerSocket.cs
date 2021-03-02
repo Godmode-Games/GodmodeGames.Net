@@ -93,7 +93,7 @@ namespace ReforgedNet.LL
         {
             if (!_pendingDisconnects.ContainsKey(ep))
             {
-                RNetMessage disc = new RNetMessage(null, Encoding.UTF8.GetBytes("disconnect_request"), null, ep, RQoSType.Realiable);
+                RNetMessage disc = new RNetMessage(null, Encoding.UTF8.GetBytes("disconnect_request"), RTransactionGenerator.GenerateId(), ep, RQoSType.Realiable); ;
                 _pendingDisconnects.Add(ep, DateTime.Now);
                 _outgoingMsgQueue.Enqueue(disc);
             }

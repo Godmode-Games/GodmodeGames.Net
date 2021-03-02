@@ -13,8 +13,8 @@ namespace ReforgedNet.LL
         public Action? Disconnected;
         public Action? ConnectFailed;
 
-        private int? DiscoverTransaction = null;
-        private int? DisconnectTransation = null;
+        private long? DiscoverTransaction = null;
+        private long? DisconnectTransation = null;
         public bool IsConnected { get; private set; } = false;
 
         public RClientSocket(RSocketSettings settings, IPacketSerializer serializer, ILogger? logger)
@@ -36,10 +36,27 @@ namespace ReforgedNet.LL
         }
 
         /// <summary>
+        /// restarts receiver-/sending-task if somehow crashed
+        /// </summary>
+        public override void Dispatch()
+        {
+            if (_recvTask != null && _recvTask.Status != TaskStatus.Running)
+            {
+                StartReceiverTask();
+            }
+            if (_sendTask != null && _sendTask.Status != TaskStatus.Running)
+            {
+                StartSendingTask();
+            }
+
+            base.Dispatch();
+        }
+
+        /// <summary>
         /// Login failed
         /// </summary>
         /// <param name="tid"></param>
-        private void OnDiscoverFailed(int tid)
+        private void OnDiscoverFailed(long tid)
         {
             if (tid == DiscoverTransaction)
             {
@@ -140,7 +157,7 @@ namespace ReforgedNet.LL
         /// <summary>
         /// Disconnect failed, never the less disconnect
         /// </summary>
-        private void OnDisconnectFailed(int tid)
+        private void OnDisconnectFailed(long tid)
         {
             if (tid == DisconnectTransation)
             {

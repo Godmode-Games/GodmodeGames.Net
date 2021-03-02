@@ -10,10 +10,11 @@ namespace ReforgedNet.LL.Serialization
         public RNetMessage Deserialize(byte[] data, EndPoint remoteEndPoint)
         {
             int? MsgId = null;
-            int? TransactionId = null;
+            long? TransactionId = null;
             RQoSType type = RQoSType.Realiable;
 
             int readCursor = 1;//byte[0] = 1 -> RNetMessage
+
 
             if (data[readCursor++] == 1)
             {
@@ -23,8 +24,8 @@ namespace ReforgedNet.LL.Serialization
 
             if (data[readCursor++] == 1)
             {
-                TransactionId = BitConverter.ToInt32(data, readCursor);
-                readCursor += sizeof(int);
+                TransactionId = BitConverter.ToInt64(data, readCursor);
+                readCursor += sizeof(long);
             } //else TransactionId = null
             
 
@@ -43,7 +44,7 @@ namespace ReforgedNet.LL.Serialization
         public RReliableNetMessageACK DeserializeACKMessage(byte[] data, EndPoint remoteEndPoint)
         {
             int? MsgId = null;
-            int TransactionId = -1;
+            long TransactionId = -1;
 
             int readCursor = 1;//byte[0] = 0 -> ACKMessage
             if (data[readCursor++] == 1)
@@ -52,8 +53,8 @@ namespace ReforgedNet.LL.Serialization
                 readCursor += sizeof(int);
             }
 
-            TransactionId = BitConverter.ToInt32(data, readCursor);
-            readCursor += sizeof(int);
+            TransactionId = BitConverter.ToInt64(data, readCursor);
+            //readCursor += sizeof(long);
 
             return new RReliableNetMessageACK(MsgId, TransactionId, remoteEndPoint);
         }
@@ -87,7 +88,7 @@ namespace ReforgedNet.LL.Serialization
             else
             {
                 bytes.Add(1); //RNetMessage
-                bytes.AddRange(BitConverter.GetBytes((int)message.MessageId));
+                bytes.AddRange(BitConverter.GetBytes(message.MessageId!.Value));
             }
 
             //nullable TransactionId
@@ -98,7 +99,7 @@ namespace ReforgedNet.LL.Serialization
             else
             {
                 bytes.Add(1);
-                bytes.AddRange(BitConverter.GetBytes((int)message.TransactionId));
+                bytes.AddRange(BitConverter.GetBytes(message.TransactionId.Value));
             }
 
             //QoSType
@@ -126,7 +127,7 @@ namespace ReforgedNet.LL.Serialization
             else
             {
                 bytes.Add(1); //RNetMessage
-                bytes.AddRange(BitConverter.GetBytes((int)message.MessageId));
+                bytes.AddRange(BitConverter.GetBytes(message.MessageId.Value));
             }
 
             //TransactionId

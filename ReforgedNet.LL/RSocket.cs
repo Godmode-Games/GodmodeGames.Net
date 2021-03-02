@@ -19,14 +19,14 @@ namespace ReforgedNet.LL
         public const int DEFAULT_RECEIVER_ROUTE = int.MinValue;
 
         /// <summary>Gets invoked if an internal error occurs.</summary>
-        public Action<int>? Error;
+        public Action<long>? Error;
 
         /// <summary>Queue for outgoing messages.</summary>
         protected readonly ConcurrentQueue<RNetMessage> _outgoingMsgQueue
             = new ConcurrentQueue<RNetMessage>();
         /// <summary>Holds information about sent unacknowledged messages. Key is transaction id.</summary>
-        protected readonly ConcurrentDictionary<int, SentUnacknowledgedMessage> _sentUnacknowledgedMessages
-            = new ConcurrentDictionary<int, SentUnacknowledgedMessage>();
+        protected readonly ConcurrentDictionary<long, SentUnacknowledgedMessage> _sentUnacknowledgedMessages
+            = new ConcurrentDictionary<long, SentUnacknowledgedMessage>();
         /// <summary>Queue for incoming messages which needs to be dispatched on any thread.</summary>
         protected readonly ConcurrentQueue<RNetMessage> _incomingMsgQueue
             = new ConcurrentQueue<RNetMessage>();
@@ -52,6 +52,8 @@ namespace ReforgedNet.LL
         protected Task? _recvTask = null;
         protected Task? _sendTask = null;
         protected CancellationTokenSource _cts;
+
+        protected List<long> _lastMessagesReceived = new List<long>();
 
         #region Statistics
         /// <summary>
@@ -145,10 +147,6 @@ namespace ReforgedNet.LL
                 }
                 _receiveDelegates[mid].Add(@delegate);
             }
-
-            /*_receiveDelegates.Add(
-                new ReceiveDelegateDefinition(messageId, @delegate)
-            );*/
         }
 
         /// <summary>
@@ -191,12 +189,28 @@ namespace ReforgedNet.LL
         /// <summary>
         /// Dispatches incoming message queue into callee thread.
         /// </summary>
-        public void Dispatch()
+        public virtual void Dispatch()
         {
             if (!_incomingMsgQueue.IsEmpty)
             {
                 while (_incomingMsgQueue.TryDequeue(out RNetMessage netMsg))
                 {
+                    // check, if the message was already received and dispatched.
+                    // maybe the sender had bad ping and resend message for reliability
+                    if (netMsg.TransactionId != null)
+                    {
+                        if (_lastMessagesReceived.Contains(netMsg.TransactionId.Value))
+                        {
+                            _logger?.WriteInfo(new LogInfo("skipping already received message."));
+                            continue;
+                        }
+                        _lastMessagesReceived.Add(netMsg.TransactionId.Value);
+                        if (_lastMessagesReceived.Count > _settings.StoreLastMessages)
+                        {
+                            _lastMessagesReceived.RemoveAt(0);
+                        }
+                    }
+
                     // If default route is registered, take that one.
                     // Otherwise search for needed receiver delegate.
                     if (netMsg.MessageId != null && isDefaultRouteRegistered)
@@ -250,7 +264,16 @@ namespace ReforgedNet.LL
                 {
                     while (_outgoingMsgQueue.TryDequeue(out RNetMessage netMsg))
                     {
-                        byte[] data = _serializer.Serialize(netMsg);
+                        byte[] data;
+                        try
+                        {
+                            data = _serializer.Serialize(netMsg);
+                        }
+                        catch(Exception ex)
+                        {
+                            _logger?.WriteError(new LogInfo("error while serializing netmessage: " + ex.Message));
+                            continue;
+                        }
                         int numOfSentBytes = _socket.SendTo(data, 0, data.Length, SocketFlags.None, netMsg.RemoteEndPoint);
 
                         if (numOfSentBytes == 0)
@@ -317,7 +340,16 @@ namespace ReforgedNet.LL
                     {
                         //byte[] data = _serializer.SerializeACKMessage(ackMsg);
 
-                        byte[] data = _serializer.SerializeACKMessage(ackMsg);
+                        byte[] data;
+                        try
+                        {
+                            data = _serializer.SerializeACKMessage(ackMsg);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.WriteError(new LogInfo("error while serializing ack message: " + ex.Message));
+                            continue;
+                        }
                         int numOfSentBytes = _socket.SendTo(data, 0, data.Length, SocketFlags.None, ackMsg.RemoteEndPoint);
 
                         if (numOfSentBytes == 0)
@@ -352,9 +384,10 @@ namespace ReforgedNet.LL
                 {
                     numOfReceivedBytes = _socket!.ReceiveFrom(data, 0, 4096, SocketFlags.None, ref RemoteEndPoint);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    break;
+                    _logger?.WriteError(new LogInfo("error while receiving data: " + ex.Message));
+                    continue;
                 }
 
                 if (numOfReceivedBytes > 0)
@@ -362,49 +395,46 @@ namespace ReforgedNet.LL
                     UpdateReceiveStatistics(numOfReceivedBytes);
                     if (_serializer.IsRequest(data))
                     {
-                        RNetMessage? msg = _serializer.Deserialize(data, RemoteEndPoint);
-                        if (msg == null)
+                        RNetMessage? msg = null;
+                        try
                         {
-#if DEBUG
-                            throw new Exception("Serializing of RNetMessage failed!");
-#elif RELEASE
-                            _logger?.WriteError(new LogInfo("Serializing of RNetMessage failed!"));
-#endif
+                            msg = _serializer.Deserialize(data, RemoteEndPoint);
                         }
-                        else
+                        catch(Exception ex)
+                        {
+                            _logger?.WriteError(new LogInfo("Serializing of RNetMessage failed: " + ex.Message));
+                            continue;
+                        }
+                        if (msg != null)
                         {
                             _incomingMsgQueue.Enqueue(msg);
                             if (msg.QoSType == RQoSType.Realiable)
                             {
 #pragma warning disable CS8629 // Nullable value type may be null.
-                                _pendingACKMessages.Enqueue(new RReliableNetMessageACK(msg.MessageId, (int)msg.TransactionId, msg.RemoteEndPoint));
+                                _pendingACKMessages.Enqueue(new RReliableNetMessageACK(msg.MessageId, msg.TransactionId!.Value, msg.RemoteEndPoint));
 #pragma warning restore CS8629 // Nullable value type may be null.
                             }
                         }
                     }
                     else if (_serializer.IsMessageACK(data))
                     {
-                        var ackMsg = _serializer.DeserializeACKMessage(data, RemoteEndPoint);
-                        if (ackMsg == null)
+                        RReliableNetMessageACK? ackMsg = null;
+                        try
                         {
-#if DEBUG
-                            throw new Exception("Serializing of ACKRNetMessage failed!");
-#elif RELEASE
-                            _logger?.WriteError(new LogInfo("Serializing of ACKRNetMessage failed!"));
-#endif
+                            ackMsg = _serializer.DeserializeACKMessage(data, RemoteEndPoint);
                         }
-                        if (!RemoveSentMessageFromUnacknowledgedMsgQueue(ackMsg))
+                        catch(Exception ex)
                         {
-                            var errorMsg = "Can't remove non existing network message from unacknowledged message list. MessageId: " + ackMsg.MessageId + " TransactionId: " + ackMsg.TransactionId;
-#if DEBUG
-                            throw new Exception(errorMsg);
-#elif RELEASE
-                        _logger?.WriteError(new LogInfo()
+                            _logger?.WriteError(new LogInfo("Serializing of ACKRNetMessage failed: " + ex.Message));
+                            continue;
+                        }
+                        if (ackMsg != null)
                         {
-                            OccuredDateTime = DateTime.Now,
-                            Message = errorMsg
-                        });
-#endif
+                            if (!RemoveSentMessageFromUnacknowledgedMsgQueue(ackMsg))
+                            {
+                                var errorMsg = "Can't remove non existing network message from unacknowledged message list. MessageId: " + ackMsg.MessageId + " TransactionId: " + ackMsg.TransactionId;
+                                _logger?.WriteError(new LogInfo(errorMsg));
+                            }
                         }
                     }
                 }
@@ -431,7 +461,7 @@ namespace ReforgedNet.LL
         }
 
         /// <summary>
-        /// Starts Receiver-Task
+        /// Starts receiver-task
         /// </summary>
         protected void StartReceiverTask()
         {
@@ -443,6 +473,23 @@ namespace ReforgedNet.LL
             {
                 _recvTask = Task.Factory.StartNew(() => ReceivingTask(_cts.Token), _cts.Token);
                 _recvTask.ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// Starts sending-task
+        /// </summary>
+        protected void StartSendingTask()
+        {
+            if (_socket == null)
+            {
+                return;
+            }
+
+            if (_sendTask == null)
+            {
+                _sendTask = Task.Factory.StartNew(() => SendingTask(_cts.Token), _cts.Token);
+                _sendTask.ConfigureAwait(false);
             }
         }
 
