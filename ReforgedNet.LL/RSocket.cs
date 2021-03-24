@@ -16,10 +16,11 @@ namespace ReforgedNet.LL
     /// </summary>
     public class RSocket
     {
-        public const int DEFAULT_RECEIVER_ROUTE = int.MinValue;
-
         /// <summary>Gets invoked if an internal error occurs.</summary>
         public Action<long>? Error;
+
+        public Action<byte[], EndPoint>? OnReceiveData = null;
+        protected Action<RNetMessage>? OnReceiveInternalData = null;
 
         /// <summary>Queue for outgoing messages.</summary>
         protected readonly ConcurrentQueue<RNetMessage> _outgoingMsgQueue
@@ -31,17 +32,6 @@ namespace ReforgedNet.LL
         protected readonly ConcurrentQueue<RNetMessage> _incomingMsgQueue
             = new ConcurrentQueue<RNetMessage>();
         protected readonly ConcurrentQueue<RReliableNetMessageACK> _pendingACKMessages = new ConcurrentQueue<RReliableNetMessageACK>();
-
-        /// <summary>Registered delegates.</summary>
-        protected IDictionary<int?, List<ReceiveDelegate>> _receiveDelegates
-            = new Dictionary<int?, List<ReceiveDelegate>>();
-        /// <summary>
-        /// Registered delegates for discover-messages
-        /// </summary>
-        protected List<ReceiveDelegate> _discoverDelegates = new List<ReceiveDelegate>();
-
-        protected ReceiveDelegate? _defaultReceiverRoute;
-        protected bool isDefaultRouteRegistered = false;
 
         protected Socket? _socket;
         protected readonly RSocketSettings _settings;
@@ -80,6 +70,10 @@ namespace ReforgedNet.LL
         /// Datetime of last received data
         /// </summary>
         public DateTime? LastDataReceived = null;
+
+        public long TotalPacketsSent = 0;
+        public long TotalPacketsLost = 0;
+        public long TotalPacketsIncomplete = 0;
         #endregion
 
         public RSocket(RSocketSettings settings, IPEndPoint remoteEndPoint, IPacketSerializer serializer, ILogger? logger)
@@ -99,92 +93,22 @@ namespace ReforgedNet.LL
         /// <param name="data"></param>
         /// <param name="remoteEndPoint"></param>
         /// <param name="qosType"></param>
-        public void Send(int messageId, ref byte[] data, EndPoint remoteEndPoint, RQoSType qosType = RQoSType.Unrealiable, Action? failCallback = null)
+        public void Send(ref byte[] data, EndPoint remoteEndPoint, RQoSType qosType = RQoSType.Unrealiable)
         {
-            var message = (qosType == RQoSType.Realiable) ?
-                new RNetMessage(messageId, data, RTransactionGenerator.GenerateId(), remoteEndPoint, qosType) :
-                new RNetMessage(messageId, data, null, remoteEndPoint, qosType);
-
+            RNetMessage message;
+            switch (qosType)
+            {
+                default:
+                case RQoSType.Realiable:
+                case RQoSType.Internal:
+                    message = new RNetMessage(data, RTransactionGenerator.GenerateId(), remoteEndPoint, qosType);
+                    break;
+                case RQoSType.Unrealiable:
+                    message = new RNetMessage(data, null, remoteEndPoint, qosType);
+                    break;
+            }
             _outgoingMsgQueue.Enqueue(message);
         }
-
-        /// <summary>
-        /// Registers receiver delegate. This function is not threadsafe and should only gets called from dispatcher thread.
-        /// </summary>
-        /// <param name="messageId"></param>
-        /// <param name="delegate"></param>
-        public void RegisterReceiver(int? messageId, ReceiveDelegate @delegate)
-        {
-            if (messageId == DEFAULT_RECEIVER_ROUTE)
-            {
-                _defaultReceiverRoute = @delegate;
-                isDefaultRouteRegistered = true;
-                return;
-            }
-
-            if (messageId == null)
-            {
-                if (!_discoverDelegates.Contains(@delegate))
-                {
-                    _discoverDelegates.Add(@delegate);
-                }
-                return;
-            }
-
-            int mid = messageId.Value;
-
-            if (_receiveDelegates.ContainsKey(mid) && _receiveDelegates[mid].Contains(@delegate))
-            {
-                //Already registered
-                return;
-            }
-            else
-            {
-
-                if (!_receiveDelegates.ContainsKey(mid))
-                {
-                    _receiveDelegates.Add(mid, new List<ReceiveDelegate>());
-                }
-                _receiveDelegates[mid].Add(@delegate);
-            }
-        }
-
-        /// <summary>
-        /// Unregisters receiver.
-        /// This function is not threadsafe and should only gets called from dispatcher thread.
-        /// </summary>
-        /// <param name="messageId"></param>
-        public void UnregisterReceiver(int? messageId, ReceiveDelegate @delegate)
-        {
-            if (messageId == DEFAULT_RECEIVER_ROUTE)
-            {
-                _defaultReceiverRoute = null;
-                isDefaultRouteRegistered = false;
-                return;
-            }
-
-            if (messageId == null)
-            {
-                if (_discoverDelegates.Contains(@delegate))
-                {
-                    _discoverDelegates.Remove(@delegate);
-                }
-                return;
-            }
-
-            if (_receiveDelegates.ContainsKey(messageId))
-            {
-                for (int i = 0; i < this._receiveDelegates[messageId].Count; i++)
-                {
-                    if (this._receiveDelegates[messageId][i] == @delegate)
-                    {
-                        this._receiveDelegates[messageId].RemoveAt(i);
-                        return;
-                    }
-                }
-            }
-        }
-
 
         /// <summary>
         /// Dispatches incoming message queue into callee thread.
@@ -197,7 +121,7 @@ namespace ReforgedNet.LL
                 {
                     // check, if the message was already received and dispatched.
                     // maybe the sender had bad ping and resend message for reliability
-                    if (netMsg.TransactionId != null)
+                    if (netMsg.QoSType != RQoSType.Unrealiable && netMsg.TransactionId != null)
                     {
                         if (_lastMessagesReceived.Contains(netMsg.TransactionId.Value))
                         {
@@ -211,33 +135,13 @@ namespace ReforgedNet.LL
                         }
                     }
 
-                    // If default route is registered, take that one.
-                    // Otherwise search for needed receiver delegate.
-                    if (netMsg.MessageId != null && isDefaultRouteRegistered)
+                    if (netMsg.QoSType == RQoSType.Internal)
                     {
-                        _defaultReceiverRoute!.Invoke(netMsg);
+                        OnReceiveInternalData?.Invoke(netMsg);
                     }
                     else
                     {
-                        if (netMsg.MessageId == null)
-                        {
-                            //discover messages
-                            for (int i = 0; i < _discoverDelegates.Count; i++)
-                            {
-                                this._discoverDelegates[i].Invoke(netMsg);
-                            }
-                        }
-                        else
-                        {
-                            int mid = netMsg.MessageId.Value;
-                            if (_receiveDelegates.ContainsKey(mid))
-                            {
-                                for (int i = 0; i < this._receiveDelegates[mid].Count; i++)
-                                {
-                                    this._receiveDelegates[mid][i].Invoke(netMsg);
-                                }
-                            }
-                        }
+                        OnReceiveData?.Invoke(netMsg.Data, netMsg.RemoteEndPoint);
                     }
                 }
             }
@@ -260,6 +164,7 @@ namespace ReforgedNet.LL
                 // Store start date time of receiving task to calculate an accurate sending delay.
                 startTime = DateTime.Now;
 
+                //Send Messages...
                 if (_socket != null && !_outgoingMsgQueue.IsEmpty)
                 {
                     while (_outgoingMsgQueue.TryDequeue(out RNetMessage netMsg))
@@ -278,7 +183,7 @@ namespace ReforgedNet.LL
 
                         if (numOfSentBytes == 0)
                         {
-                            _logger?.WriteWarning(new LogInfo("Sent empty message. MessageId: " + netMsg.MessageId?.ToString()));
+                            _logger?.WriteWarning(new LogInfo("Sent empty message. TransactionId: " + netMsg.TransactionId?.ToString()));
                         }
                         else
                         {
@@ -286,16 +191,17 @@ namespace ReforgedNet.LL
                             UpdateSendStatistics(numOfSentBytes);
 
                             //Start receiving...
-                            this.StartReceiverTask();
+                            StartReceiverTask();
                         }
 
-                        if (netMsg.QoSType == RQoSType.Realiable)
+                        if (netMsg.QoSType == RQoSType.Realiable || netMsg.QoSType == RQoSType.Internal)
                         {
                             _sentUnacknowledgedMessages.TryAdd(netMsg.TransactionId!.Value, new SentUnacknowledgedMessage(data, netMsg.RemoteEndPoint, DateTime.Now.AddMilliseconds(_settings.SendRetryDelay), netMsg.TransactionId.Value));
                         }
                     }
                 }
 
+                //resend unacknowledged Messages 
                 if (_socket != null && !_sentUnacknowledgedMessages.IsEmpty)
                 {
                     foreach (var unAckMsg in _sentUnacknowledgedMessages)
@@ -314,7 +220,7 @@ namespace ReforgedNet.LL
                             else if (numOfSentBytes > 0)
                             {
                                 //Start receiving...
-                                this.StartReceiverTask();
+                                StartReceiverTask();
                             }
 
                             UpdateSendStatistics(numOfSentBytes);
@@ -324,6 +230,9 @@ namespace ReforgedNet.LL
                                 _sentUnacknowledgedMessages.TryRemove(unAckMsg.Key, out _);
 
                                 var errorMsg = "Number of max retries reached. RemoteEndPoint: " + unAckMsg.Value.RemoteEndPoint;
+
+                                TotalPacketsLost++;
+
                                 _logger?.WriteError(new LogInfo(errorMsg));
                                 Error?.Invoke(unAckMsg.Value.TransactionId);
                                 continue;
@@ -334,12 +243,11 @@ namespace ReforgedNet.LL
                     }
                 }
 
+                //Send ACK Messages
                 if (_socket != null && !_pendingACKMessages.IsEmpty)
                 {
                     while (_pendingACKMessages.TryDequeue(out RReliableNetMessageACK ackMsg))
                     {
-                        //byte[] data = _serializer.SerializeACKMessage(ackMsg);
-
                         byte[] data;
                         try
                         {
@@ -354,7 +262,7 @@ namespace ReforgedNet.LL
 
                         if (numOfSentBytes == 0)
                         {
-                            _logger?.WriteWarning(new LogInfo("Sent empty ack message. MessageId: " + ackMsg.MessageId?.ToString()));
+                            _logger?.WriteWarning(new LogInfo("Sent empty ack message. TransactionId: " + ackMsg.TransactionId.ToString()));
                         }
                         else
                         {
@@ -396,23 +304,30 @@ namespace ReforgedNet.LL
                     if (_serializer.IsRequest(data))
                     {
                         RNetMessage? msg = null;
+                        EDeserializeError deserialize_error = EDeserializeError.None;
                         try
                         {
-                            msg = _serializer.Deserialize(data, RemoteEndPoint);
+                            msg = _serializer.Deserialize(data, RemoteEndPoint, out deserialize_error);
                         }
                         catch(Exception ex)
                         {
                             _logger?.WriteError(new LogInfo("Serializing of RNetMessage failed: " + ex.Message));
                             continue;
                         }
-                        if (msg != null)
+
+                        if (deserialize_error != EDeserializeError.None || msg == null)
+                        {
+                            _logger?.WriteError(new LogInfo("Got incomplete RNetMessage!"));
+                            TotalPacketsIncomplete++;
+                            continue;
+                        }
+                        else 
                         {
                             _incomingMsgQueue.Enqueue(msg);
-                            if (msg.QoSType == RQoSType.Realiable)
+                            if (msg.QoSType == RQoSType.Realiable || msg.QoSType == RQoSType.Internal)
                             {
-#pragma warning disable CS8629 // Nullable value type may be null.
-                                _pendingACKMessages.Enqueue(new RReliableNetMessageACK(msg.MessageId, msg.TransactionId!.Value, msg.RemoteEndPoint));
-#pragma warning restore CS8629 // Nullable value type may be null.
+                                //Send ACK Message
+                                _pendingACKMessages.Enqueue(new RReliableNetMessageACK(msg.TransactionId!.Value, msg.RemoteEndPoint));
                             }
                         }
                     }
@@ -432,7 +347,7 @@ namespace ReforgedNet.LL
                         {
                             if (!RemoveSentMessageFromUnacknowledgedMsgQueue(ackMsg))
                             {
-                                var errorMsg = "Can't remove non existing network message from unacknowledged message list. MessageId: " + ackMsg.MessageId + " TransactionId: " + ackMsg.TransactionId;
+                                var errorMsg = "Can't remove non existing network message from unacknowledged message list. TransactionId: " + ackMsg.TransactionId;
                                 _logger?.WriteError(new LogInfo(errorMsg));
                             }
                         }
@@ -456,8 +371,9 @@ namespace ReforgedNet.LL
         /// </summary>
         protected void CreateSocket()
         {
-            _socket = new Socket(this.RemoteEndPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+            _socket = new Socket(RemoteEndPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
             _socket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.IPv6Only, false);
+            _socket.DontFragment = true;
         }
 
         /// <summary>
@@ -499,18 +415,18 @@ namespace ReforgedNet.LL
         /// <param name="numOfSentBytes"></param>
         private void UpdateSendStatistics(int numOfSentBytes)
         {
-            this.SendBytesTotal += numOfSentBytes;
+            SendBytesTotal += numOfSentBytes;
 
             int curr = DateTime.Now.Second;
-            if (curr == this.CurrentSecondReceive)
+            if (curr == CurrentSecondReceive)
             {
-                this.ReceiveCurrentSecond += numOfSentBytes;
+                ReceiveCurrentSecond += numOfSentBytes;
             }
             else
             {
-                this.ReceiveLastSecond = this.ReceiveCurrentSecond;
-                this.ReceiveCurrentSecond = numOfSentBytes;
-                this.CurrentSecondReceive = curr;
+                ReceiveLastSecond = ReceiveCurrentSecond;
+                ReceiveCurrentSecond = numOfSentBytes;
+                CurrentSecondReceive = curr;
             }
         }
 
@@ -521,19 +437,19 @@ namespace ReforgedNet.LL
         private void UpdateReceiveStatistics(int numOfReceivedBytes)
         {
             //Statisktiken
-            this.LastDataReceived = DateTime.Now;
-            this.ReceivedBytesTotal += numOfReceivedBytes;
+            LastDataReceived = DateTime.Now;
+            ReceivedBytesTotal += numOfReceivedBytes;
 
             int curr = DateTime.Now.Second;
-            if (curr == this.CurrentSecondReceive)
+            if (curr == CurrentSecondReceive)
             {
-                this.ReceiveCurrentSecond += numOfReceivedBytes;
+                ReceiveCurrentSecond += numOfReceivedBytes;
             }
             else
             {
-                this.ReceiveLastSecond = this.ReceiveCurrentSecond;
-                this.ReceiveCurrentSecond = numOfReceivedBytes;
-                this.CurrentSecondReceive = curr;
+                ReceiveLastSecond = ReceiveCurrentSecond;
+                ReceiveCurrentSecond = numOfReceivedBytes;
+                CurrentSecondReceive = curr;
             }
         }
     }

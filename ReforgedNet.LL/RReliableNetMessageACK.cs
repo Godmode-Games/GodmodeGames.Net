@@ -10,13 +10,11 @@ namespace ReforgedNet.LL
     /// </summary>
     public class RReliableNetMessageACK
     {
-        public readonly int? MessageId;
         public readonly long TransactionId;
         public readonly EndPoint RemoteEndPoint;
 
-        public RReliableNetMessageACK(int? messageId, long transactionId, EndPoint remoteEndPoint)
+        public RReliableNetMessageACK(long transactionId, EndPoint remoteEndPoint)
         {
-            MessageId = messageId;
             TransactionId = transactionId;
             RemoteEndPoint = remoteEndPoint;
         }

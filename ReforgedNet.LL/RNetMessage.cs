@@ -12,8 +12,6 @@ namespace ReforgedNet.LL
     /// </summary>
     public class RNetMessage : IEquatable<RNetMessage> 
     {
-        /// <summary>Message id is used to identify different types of message types, message is discovermessage if null</summary>
-        public readonly int? MessageId;
         /// <summary>Byte array of transmitted content.</summary>
         public readonly byte[] Data;
         /// <summary>Transaction id to identify reliable messages.</summary>
@@ -21,9 +19,8 @@ namespace ReforgedNet.LL
         public readonly EndPoint RemoteEndPoint;
         public readonly RQoSType QoSType;
 
-        public RNetMessage(int? messageId, byte[] data, long? transactionId, EndPoint remoteEP, RQoSType qosType = RQoSType.Unrealiable)
+        public RNetMessage(byte[] data, long? transactionId, EndPoint remoteEP, RQoSType qosType = RQoSType.Unrealiable)
         {
-            MessageId = messageId;
             Data = data;
             TransactionId = transactionId;
             RemoteEndPoint = remoteEP;
@@ -32,8 +29,7 @@ namespace ReforgedNet.LL
 
         public bool Equals(RNetMessage other)
         {
-            return MessageId == other.MessageId &&
-                   Data == other.Data &&
+            return Data == other.Data &&
                    TransactionId == other.TransactionId &&
                    RemoteEndPoint.Equals(other.RemoteEndPoint) &&
                    QoSType == other.QoSType;

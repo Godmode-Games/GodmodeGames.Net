@@ -5,6 +5,12 @@ using System.Text;
 
 namespace ReforgedNet.LL.Serialization
 {
+    public enum EDeserializeError
+    {
+        None = 1,
+        NotComplete
+    }
+
     public interface IPacketSerializer
     {
         /// <summary>
@@ -18,7 +24,7 @@ namespace ReforgedNet.LL.Serialization
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public RNetMessage? Deserialize(byte[] data, EndPoint remoteEndPoint);
+        public RNetMessage? Deserialize(byte[] data, EndPoint remoteEndPoint, out EDeserializeError error);
         /// <summary>
         /// Returns true if given byte array is a request.
         /// </summary>

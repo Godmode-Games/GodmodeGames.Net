@@ -10,8 +10,8 @@ namespace ReforgedNet.LL
     public class RClientSocket : RSocket
     {
         public Action? Connected;
-        public Action? Disconnected;
         public Action? ConnectFailed;
+        public Action<bool>? Disconnected;
 
         private long? DiscoverTransaction = null;
         private long? DisconnectTransation = null;
@@ -31,7 +31,7 @@ namespace ReforgedNet.LL
             _sendTask = Task.Factory.StartNew(() => SendingTask(_cts.Token), _cts.Token);
             _sendTask.ConfigureAwait(false);
 
-            RegisterReceiver(null, OnDiscoverMessage);
+            OnReceiveInternalData += this.OnInternalMessage;
             SendHello();
         }
 
@@ -40,6 +40,7 @@ namespace ReforgedNet.LL
         /// </summary>
         public override void Dispatch()
         {
+            //Keep tasks running ...
             if (_recvTask != null && _recvTask.Status != TaskStatus.Running)
             {
                 StartReceiverTask();
@@ -68,8 +69,12 @@ namespace ReforgedNet.LL
         /// <summary>
         /// Close connection
         /// </summary>
-        public void DisconnectAsync()
+        public void Disconnect(Action<bool>? disconnectCallback = null)
         {
+            if (disconnectCallback != null)
+            {
+                Disconnected += disconnectCallback;
+            }
             SendDisconnect();
         }
 
@@ -86,7 +91,7 @@ namespace ReforgedNet.LL
 
             Error += OnDiscoverFailed;
 
-            RNetMessage discover = new RNetMessage(null, Encoding.UTF8.GetBytes("discover"), DiscoverTransaction, RemoteEndPoint, RQoSType.Realiable);
+            RNetMessage discover = new RNetMessage(Encoding.UTF8.GetBytes("discover"), DiscoverTransaction, RemoteEndPoint, RQoSType.Internal);
             _outgoingMsgQueue.Enqueue(discover);
         }
 
@@ -94,8 +99,14 @@ namespace ReforgedNet.LL
         /// Discover-Answer arrived
         /// </summary>
         /// <param name="message"></param>
-        private void OnDiscoverMessage(RNetMessage message)
+        private void OnInternalMessage(RNetMessage message)
         {
+            if (message.RemoteEndPoint != RemoteEndPoint)
+            {
+                //not the server...
+                return;
+            }
+
             string type = "discover";
             try
             {
@@ -114,18 +125,18 @@ namespace ReforgedNet.LL
                 IsConnected = false;
                 DisconnectTransation = null;
 
-                Disconnected?.Invoke();
+                Disconnected?.Invoke(true);
                 Error -= OnDisconnectFailed; //Clear all discover-fails
             }
             else if (type.Equals("disconnect_request") && IsConnected)
             {
                 //Server requests a disconnect -> anwser confirm
-                RNetMessage answer = new RNetMessage(null, Encoding.UTF8.GetBytes("disconnect_response"), message.TransactionId, RemoteEndPoint, RQoSType.Realiable);
+                RNetMessage answer = new RNetMessage(Encoding.UTF8.GetBytes("disconnect_response"), message.TransactionId, RemoteEndPoint, RQoSType.Internal);
                 _logger?.WriteInfo(new LogInfo("Disconnect by server"));
 
                 IsConnected = false;
                 DisconnectTransation = null;
-                Disconnected?.Invoke();
+                Disconnected?.Invoke(false);
             }
             else if (type.Equals("discover") && !IsConnected && DiscoverTransaction == message.TransactionId)
             {
@@ -150,7 +161,7 @@ namespace ReforgedNet.LL
             }
 
             Error += OnDisconnectFailed;
-            RNetMessage disc = new RNetMessage(null, Encoding.UTF8.GetBytes("disconnect_request"), DisconnectTransation, RemoteEndPoint, RQoSType.Realiable);
+            RNetMessage disc = new RNetMessage(Encoding.UTF8.GetBytes("disconnect_request"), DisconnectTransation, RemoteEndPoint, RQoSType.Internal);
             _outgoingMsgQueue.Enqueue(disc);
         }
 
@@ -165,7 +176,7 @@ namespace ReforgedNet.LL
                 IsConnected = false;
                 DisconnectTransation = null;
 
-                Disconnected?.Invoke();
+                Disconnected?.Invoke(false);
             }
         }
     }

@@ -6,7 +6,8 @@ namespace ReforgedNet.LL
 {
     public enum RQoSType : int
     {
-        Unrealiable = 0,
+        Internal = 0,
+        Unrealiable,
         Realiable,
     }
 }

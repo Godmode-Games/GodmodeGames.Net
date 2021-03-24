@@ -18,9 +18,10 @@ namespace ReforgedNet.LL
         public delegate void ClientDiscoverMessageHandler(EndPoint ep);
         public event ClientDiscoverMessageHandler? ClientDiscoverMessage = null;
 
-        public delegate void ClientDisconnectHandler(EndPoint ep);
-        public event ClientDisconnectHandler? ClientDisconnect = null;
+        public delegate void ClientDisconnectHandler(EndPoint ep, bool by_client);
+        public event ClientDisconnectHandler? ClientDisconnected = null;
         #endregion
+
         public RServerSocket(RSocketSettings settings, IPEndPoint remoteEndPoint, IPacketSerializer serializer, ILogger? logger) : base(settings, remoteEndPoint, serializer, logger)
         {
             
@@ -41,11 +42,11 @@ namespace ReforgedNet.LL
                 _sendTask = Task.Factory.StartNew(() => SendingTask(_cts.Token), _cts.Token);
                 _sendTask.ConfigureAwait(false);
 
-                RegisterReceiver(null, OnDiscoverMessage);
+                OnReceiveInternalData = OnInternalMessage;
             }
         }
 
-        private void OnDiscoverMessage(RNetMessage message)
+        private void OnInternalMessage(RNetMessage message)
         {
             string type = "discover";
             try
@@ -63,8 +64,8 @@ namespace ReforgedNet.LL
             {
                 //Client requests disconnect - send response
                 _logger?.WriteInfo(new LogInfo("Connection closed by " + message.RemoteEndPoint.ToString()));
-                discover = new RNetMessage(null, Encoding.UTF8.GetBytes("disconncet_response"), message.TransactionId, message.RemoteEndPoint, RQoSType.Realiable);                
-                ClientDisconnect?.Invoke(message.RemoteEndPoint);
+                discover = new RNetMessage(Encoding.UTF8.GetBytes("disconnect_response"), message.TransactionId, message.RemoteEndPoint, RQoSType.Internal);                
+                ClientDisconnected?.Invoke(message.RemoteEndPoint, true);
             }
             else if (type.Equals("disconnect_response"))
             {
@@ -73,14 +74,14 @@ namespace ReforgedNet.LL
                 {
                     _logger?.WriteInfo(new LogInfo("Connection to " + message.RemoteEndPoint + " closed by server"));
                     _pendingDisconnects.Remove(message.RemoteEndPoint);
-                    ClientDisconnect?.Invoke(message.RemoteEndPoint);
+                    ClientDisconnected?.Invoke(message.RemoteEndPoint, false);
                 }
             }
             else if (type.Equals("discover"))
             {
                 _logger?.WriteInfo(new LogInfo("Incomming connection from " + message.RemoteEndPoint.ToString()));
                 ClientDiscoverMessage?.Invoke(message.RemoteEndPoint);
-                discover = new RNetMessage(null, Encoding.UTF8.GetBytes("discover"), message.TransactionId, message.RemoteEndPoint, RQoSType.Realiable);
+                discover = new RNetMessage(Encoding.UTF8.GetBytes("discover"), message.TransactionId, message.RemoteEndPoint, RQoSType.Internal);
             }
 
             if (discover != null)
@@ -89,11 +90,11 @@ namespace ReforgedNet.LL
             }
         }
 
-        public void DisconnectEndPointAsync(EndPoint ep)
+        public void DisconnectEndPoint(EndPoint ep)
         {
             if (!_pendingDisconnects.ContainsKey(ep))
             {
-                RNetMessage disc = new RNetMessage(null, Encoding.UTF8.GetBytes("disconnect_request"), RTransactionGenerator.GenerateId(), ep, RQoSType.Realiable); ;
+                RNetMessage disc = new RNetMessage(Encoding.UTF8.GetBytes("disconnect_request"), RTransactionGenerator.GenerateId(), ep, RQoSType.Internal);
                 _pendingDisconnects.Add(ep, DateTime.Now);
                 _outgoingMsgQueue.Enqueue(disc);
             }
@@ -118,7 +119,7 @@ namespace ReforgedNet.LL
                 foreach (EndPoint ep in removeEndPoint)
                 {
                     _logger?.WriteInfo(new LogInfo("Disconnect timeout for " + ep.ToString() + " - force disconnect"));
-                    ClientDisconnect?.Invoke(ep);
+                    ClientDisconnected?.Invoke(ep, false);
                     _pendingDisconnects.Remove(ep);
                 }
             }

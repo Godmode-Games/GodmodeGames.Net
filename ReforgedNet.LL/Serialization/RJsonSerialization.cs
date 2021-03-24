@@ -28,7 +28,6 @@ namespace ReforgedNet.LL.Serialization
         {
             JObject json = new JObject();
             json["qos"] = (int)message.QoSType;
-            json["msgId"] = message.MessageId;
 
             if (message.TransactionId.HasValue)
             {
@@ -46,15 +45,15 @@ namespace ReforgedNet.LL.Serialization
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public RNetMessage? Deserialize(byte[] data, EndPoint remoteEndPoint)
+        public RNetMessage? Deserialize(byte[] data, EndPoint remoteEndPoint, out EDeserializeError error)
         {
+            error = EDeserializeError.None;
             try
             {
                 JObject json = JObject.Parse(ASCIIEncoding.UTF8.GetString(data));
                 if (json["msgId"]?.ToObject<int?>() == null)
                 {
                     var message = new RNetMessage(
-                        null,
                         json["data"]?.ToObject<byte[]>(),
                         json["tId"]?.ToObject<int>(),
                         remoteEndPoint,
@@ -65,7 +64,6 @@ namespace ReforgedNet.LL.Serialization
                 else
                 {
                     var message = new RNetMessage(
-                        json["msgId"]!.ToObject<int>(),
                         json["data"]?.ToObject<byte[]>(),
                         json["tId"]?.ToObject<int>(),
                         remoteEndPoint,
@@ -76,6 +74,7 @@ namespace ReforgedNet.LL.Serialization
             }
             catch
             {
+                error = EDeserializeError.NotComplete;
                 return null;
             }
         }
@@ -88,7 +87,6 @@ namespace ReforgedNet.LL.Serialization
         public byte[] SerializeACKMessage(RReliableNetMessageACK message)
         {
             JObject json = new JObject();
-            json["msgId"] = message.MessageId;
             json["tId"] = message.TransactionId;
 
             return ASCIIEncoding.UTF8.GetBytes(json.ToString());
@@ -108,7 +106,6 @@ namespace ReforgedNet.LL.Serialization
                 if (json["msgId"] == null)
                 {
                     return new RReliableNetMessageACK(
-                        null,
                         json["tId"]!.ToObject<int>(),
                         remoteEndPoint
                     );
@@ -116,7 +113,6 @@ namespace ReforgedNet.LL.Serialization
                 else
                 {
                     return new RReliableNetMessageACK(
-                        json["msgId"]!.ToObject<int>(),
                         json["tId"]!.ToObject<int>(),
                         remoteEndPoint
                     );

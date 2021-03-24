@@ -28,6 +28,7 @@ namespace ReforgedNet.Client
             Socket.Connected += OnConnectSuccessful;
             Socket.Error += OnConnectFailed;
             Socket.Connect(remoteEndPoint);
+            Socket.Disconnected += OnDisconnect;
             Console.WriteLine("Client started.");
         }
 
@@ -39,22 +40,28 @@ namespace ReforgedNet.Client
         private void OnConnectSuccessful()
         {
             // Register receiver
-            Socket.RegisterReceiver(RSocket.DEFAULT_RECEIVER_ROUTE, (RNetMessage message) =>
+            Socket.OnReceiveData = (byte[] data, EndPoint ep) =>
             {
-                Console.WriteLine($"Received from: {message.RemoteEndPoint}, message:" + ASCIIEncoding.UTF8.GetString(message.Data));
-                Socket.Disconnected += OnDisconnect;
-                //Socket.DisconnectAsync();
-            });
+                Console.WriteLine($"Received from: {ep}, message:" + ASCIIEncoding.UTF8.GetString(data));
+                //Socket.Disconnect();
+            };
 
             Console.WriteLine("Connection to server successful.");
 
             var data = ASCIIEncoding.UTF8.GetBytes("hello-server!");
-            Socket.Send(RSocket.DEFAULT_RECEIVER_ROUTE, ref data, Socket.RemoteEndPoint, RQoSType.Realiable);
+            Socket.Send(ref data, Socket.RemoteEndPoint, RQoSType.Realiable);
         }
 
-        private void OnDisconnect()
+        private void OnDisconnect(bool by_client)
         {
-            Console.WriteLine("Connection closed");
+            if (by_client)
+            {
+                Console.WriteLine("Connection closed");
+            }
+            else
+            {
+                Console.WriteLine("Connection closed by server");
+            }
             Socket.Close();
         }
     }

@@ -26,30 +26,37 @@ namespace ReforgedNet.Server
             Socket = new RServerSocket(settings, remoteEndPoint, new RByteSerialization(), null);
 
             Socket.ClientDiscoverMessage += OnNewClient;
-            Socket.ClientDisconnect += OnCloseClient;
+            Socket.ClientDisconnected += OnCloseClient;
             Socket.StartListen();
             Console.WriteLine("Server started.");
 
             // Register receiver
-            Socket.RegisterReceiver(RSocket.DEFAULT_RECEIVER_ROUTE, async (RNetMessage message) =>
+            Socket.OnReceiveData = async (byte[] data, EndPoint ep) => 
             {
-                Console.WriteLine($"Received from: {message.RemoteEndPoint}, message:" + ASCIIEncoding.UTF8.GetString(message.Data));
+                Console.WriteLine($"Received from: {ep}, message: " + ASCIIEncoding.UTF8.GetString(data));
 
                 await Task.Delay(100);
 
-                var messageString = "hello-client!";
-                var data = ASCIIEncoding.UTF8.GetBytes(messageString);
-                Socket.Send(1, ref data, message.RemoteEndPoint);
+                string message = "hello-client";
+                var messagedata = Encoding.ASCII.GetBytes("hello-client!");
+                Socket.Send(ref messagedata, ep, RQoSType.Realiable);
 
-                Console.WriteLine($"Sent message: {messageString}, to: {message.RemoteEndPoint}");
+                Console.WriteLine($"Sent message: {message}, to: {ep}");
 
-                this.Socket.DisconnectEndPointAsync(message.RemoteEndPoint);
-            });
+                this.Socket.DisconnectEndPoint(ep);
+            };
         }
 
-        private void OnCloseClient(EndPoint ep)
+        private void OnCloseClient(EndPoint ep, bool by_client)
         {
-            Console.WriteLine("Connection closed: " + ep.ToString());
+            if (by_client)
+            {
+                Console.WriteLine("Connection closed by " + ep.ToString());
+            }
+            else
+            {
+                Console.WriteLine("Server disconnects " + ep.ToString());
+            }
         }
 
         private void OnNewClient(EndPoint ep)

@@ -1,26 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net;
-using System.Text;
 
 namespace ReforgedNet.LL.Serialization
 {
     public class RByteSerialization : IPacketSerializer
     {
-        public RNetMessage Deserialize(byte[] data, EndPoint remoteEndPoint)
+        public RNetMessage? Deserialize(byte[] data, EndPoint remoteEndPoint, out EDeserializeError error)
         {
-            int? MsgId = null;
+            error = EDeserializeError.None;
+            int DataSize = data.Length;
+
             long? TransactionId = null;
             RQoSType type = RQoSType.Realiable;
 
             int readCursor = 1;//byte[0] = 1 -> RNetMessage
-
-
-            if (data[readCursor++] == 1)
-            {
-                MsgId = BitConverter.ToInt32(data, readCursor);
-                readCursor += sizeof(int);
-            } //else MsgId = null; 
 
             if (data[readCursor++] == 1)
             {
@@ -28,35 +22,46 @@ namespace ReforgedNet.LL.Serialization
                 readCursor += sizeof(long);
             } //else TransactionId = null
             
+            if (readCursor > DataSize)
+            {
+                error = EDeserializeError.NotComplete;
+                return null;
+            }
 
             type = (RQoSType)BitConverter.ToInt32(data, readCursor);
             readCursor += sizeof(int);
 
+            if (readCursor > DataSize)
+            {
+                error = EDeserializeError.NotComplete;
+                return null;
+            }
+
             int data_length = BitConverter.ToInt32(data, readCursor);
             readCursor += sizeof(int);
+
+            if (readCursor + data_length > DataSize)
+            {
+                error = EDeserializeError.NotComplete;
+                return null;
+            }
 
             byte[] rec_data = new byte[data_length];
             Array.Copy(data, readCursor, rec_data, 0, data_length);
 
-            return new RNetMessage(MsgId, rec_data, TransactionId, remoteEndPoint, type);
+            return new RNetMessage(rec_data, TransactionId, remoteEndPoint, type);
         }
 
         public RReliableNetMessageACK DeserializeACKMessage(byte[] data, EndPoint remoteEndPoint)
         {
-            int? MsgId = null;
             long TransactionId = -1;
 
             int readCursor = 1;//byte[0] = 0 -> ACKMessage
-            if (data[readCursor++] == 1)
-            {
-                MsgId = BitConverter.ToInt32(data, readCursor);
-                readCursor += sizeof(int);
-            }
 
             TransactionId = BitConverter.ToInt64(data, readCursor);
             //readCursor += sizeof(long);
 
-            return new RReliableNetMessageACK(MsgId, TransactionId, remoteEndPoint);
+            return new RReliableNetMessageACK(TransactionId, remoteEndPoint);
         }
 
         public bool IsMessageACK(byte[] data)
@@ -79,17 +84,6 @@ namespace ReforgedNet.LL.Serialization
 
             //First Byte -> 1 if NetMessage, 0 if ACK
             bytes.Add(1);
-
-            //nullable MessageId
-            if (message.MessageId == null)
-            {
-                bytes.Add(0); //Discover Packet
-            }
-            else
-            {
-                bytes.Add(1); //RNetMessage
-                bytes.AddRange(BitConverter.GetBytes(message.MessageId!.Value));
-            }
 
             //nullable TransactionId
             if (message.TransactionId == null)
@@ -118,17 +112,6 @@ namespace ReforgedNet.LL.Serialization
 
             //First Byte -> 1 if NetMessage, 0 if ACK
             bytes.Add(0);
-
-            //nullable MessageId
-            if (message.MessageId == null)
-            {
-                bytes.Add(0); //Discover Packet
-            }
-            else
-            {
-                bytes.Add(1); //RNetMessage
-                bytes.AddRange(BitConverter.GetBytes(message.MessageId.Value));
-            }
 
             //TransactionId
             bytes.AddRange(BitConverter.GetBytes(message.TransactionId));
