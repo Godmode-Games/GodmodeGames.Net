@@ -321,6 +321,12 @@ namespace ReforgedNet.LL
                             TotalPacketsIncomplete++;
                             continue;
                         }
+                        else if (msg.QoSType == RQoSType.Internal)
+                        {
+                            //Handle internal Messages instant
+                            OnReceiveInternalData?.Invoke(msg);
+                            _pendingACKMessages.Enqueue(new RReliableNetMessageACK(msg.TransactionId!.Value, msg.RemoteEndPoint));
+                        }
                         else 
                         {
                             _incomingMsgQueue.Enqueue(msg);

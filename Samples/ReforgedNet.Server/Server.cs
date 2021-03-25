@@ -43,7 +43,7 @@ namespace ReforgedNet.Server
 
                 Console.WriteLine($"Sent message: {message}, to: {ep}");
 
-                this.Socket.DisconnectEndPoint(ep);
+                //this.Socket.DisconnectEndPoint(ep);
             };
         }
 

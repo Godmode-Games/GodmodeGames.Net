@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Text;
 using System.Threading;
+using static ReforgedNet.LL.RClientSocket;
 
 namespace ReforgedNet.Client
 {
@@ -39,11 +40,14 @@ namespace ReforgedNet.Client
 
         private void OnConnectSuccessful()
         {
+            Socket.Disconnected += this.OnDisconnect;
+
             // Register receiver
             Socket.OnReceiveData = (byte[] data, EndPoint ep) =>
             {
                 Console.WriteLine($"Received from: {ep}, message:" + ASCIIEncoding.UTF8.GetString(data));
-                //Socket.Disconnect();
+                Socket.Disconnect();
+                Console.WriteLine("closed connection");
             };
 
             Console.WriteLine("Connection to server successful.");
@@ -52,17 +56,12 @@ namespace ReforgedNet.Client
             Socket.Send(ref data, Socket.RemoteEndPoint, RQoSType.Realiable);
         }
 
-        private void OnDisconnect(bool by_client)
+        private void OnDisconnect(EDisconnectedBy disconnected_by)
         {
-            if (by_client)
-            {
-                Console.WriteLine("Connection closed");
-            }
-            else
+            if (disconnected_by == EDisconnectedBy.Server)
             {
                 Console.WriteLine("Connection closed by server");
             }
-            Socket.Close();
         }
     }
 }

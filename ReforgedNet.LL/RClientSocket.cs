@@ -3,18 +3,23 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ReforgedNet.LL
 {
     public class RClientSocket : RSocket
     {
+        public enum EDisconnectedBy { Client, Server, Timeout }
+
         public Action? Connected;
         public Action? ConnectFailed;
-        public Action<bool>? Disconnected;
+        public Action<EDisconnectedBy>? Disconnected;
 
         private long? DiscoverTransaction = null;
         private long? DisconnectTransation = null;
+        private bool FireDisconnectAction = false;
+
         public bool IsConnected { get; private set; } = false;
 
         public RClientSocket(RSocketSettings settings, IPacketSerializer serializer, ILogger? logger)
@@ -51,6 +56,13 @@ namespace ReforgedNet.LL
             }
 
             base.Dispatch();
+
+            if (FireDisconnectAction) //invoke in main thread
+            {
+                FireDisconnectAction = false;
+                Disconnected?.Invoke(EDisconnectedBy.Server);
+                Close(); // close socket
+            }
         }
 
         /// <summary>
@@ -62,6 +74,7 @@ namespace ReforgedNet.LL
             if (tid == DiscoverTransaction)
             {
                 IsConnected = false;
+                Close();
                 ConnectFailed?.Invoke();
             }
         }
@@ -69,13 +82,24 @@ namespace ReforgedNet.LL
         /// <summary>
         /// Close connection
         /// </summary>
-        public void Disconnect(Action<bool>? disconnectCallback = null)
+        public void Disconnect()
         {
-            if (disconnectCallback != null)
+            if (this.IsConnected == false)
             {
-                Disconnected += disconnectCallback;
+                return;
             }
+
             SendDisconnect();
+
+            DateTime start = DateTime.Now;
+            while (this.IsConnected != false && DateTime.Now.Subtract(start).TotalMilliseconds < 2000)
+            {
+                Thread.Sleep(50);
+            }
+
+            Close(); //close socket
+
+            Disconnected?.Invoke(EDisconnectedBy.Client);
         }
 
         /// <summary>
@@ -120,13 +144,10 @@ namespace ReforgedNet.LL
 
             if (type.Equals("disconnect_response") && IsConnected && DisconnectTransation == message.TransactionId)
             {
-                //Disconnect answer from server
+                //Disconnect answer from server - Action invoked in Disconnect-Method
                 _logger?.WriteInfo(new LogInfo("Disconnect successful"));
                 IsConnected = false;
                 DisconnectTransation = null;
-
-                Disconnected?.Invoke(true);
-                Error -= OnDisconnectFailed; //Clear all discover-fails
             }
             else if (type.Equals("disconnect_request") && IsConnected)
             {
@@ -136,7 +157,7 @@ namespace ReforgedNet.LL
 
                 IsConnected = false;
                 DisconnectTransation = null;
-                Disconnected?.Invoke(false);
+                FireDisconnectAction = true; //Invoke action in Dispatch-method (on main thread)
             }
             else if (type.Equals("discover") && !IsConnected && DiscoverTransaction == message.TransactionId)
             {
@@ -160,24 +181,8 @@ namespace ReforgedNet.LL
                 DisconnectTransation = RTransactionGenerator.GenerateId();
             }
 
-            Error += OnDisconnectFailed;
             RNetMessage disc = new RNetMessage(Encoding.UTF8.GetBytes("disconnect_request"), DisconnectTransation, RemoteEndPoint, RQoSType.Internal);
             _outgoingMsgQueue.Enqueue(disc);
-        }
-
-        /// <summary>
-        /// Disconnect failed, never the less disconnect
-        /// </summary>
-        private void OnDisconnectFailed(long tid)
-        {
-            if (tid == DisconnectTransation)
-            {
-                _logger?.WriteInfo(new LogInfo("Disconnect failed, cancel connection anyways"));
-                IsConnected = false;
-                DisconnectTransation = null;
-
-                Disconnected?.Invoke(false);
-            }
         }
     }
 }
