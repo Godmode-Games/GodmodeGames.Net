@@ -19,7 +19,7 @@ namespace ReforgedNet.LL
         /// <summary>Gets invoked if an internal error occurs.</summary>
         public Action<long>? Error;
 
-        public Action<byte[], EndPoint>? OnReceiveData = null;
+        public Action<byte[], IPEndPoint>? OnReceiveData = null;
         protected Action<RNetMessage>? OnReceiveInternalData = null;
 
         /// <summary>Queue for outgoing messages.</summary>
@@ -141,7 +141,7 @@ namespace ReforgedNet.LL
                     }
                     else
                     {
-                        OnReceiveData?.Invoke(netMsg.Data, netMsg.RemoteEndPoint);
+                        OnReceiveData?.Invoke(netMsg.Data, (IPEndPoint)netMsg.RemoteEndPoint);
                     }
                 }
             }
