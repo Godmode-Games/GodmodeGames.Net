@@ -24,7 +24,7 @@ namespace ReforgedNet.LL.Serialization
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public RNetMessage? Deserialize(byte[] data, EndPoint remoteEndPoint, out EDeserializeError error);
+        public RNetMessage? Deserialize(byte[] data, IPEndPoint remoteEndPoint, out EDeserializeError error);
         /// <summary>
         /// Returns true if given byte array is a request.
         /// </summary>

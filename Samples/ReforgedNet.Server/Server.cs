@@ -31,7 +31,7 @@ namespace ReforgedNet.Server
             Console.WriteLine("Server started.");
 
             // Register receiver
-            Socket.OnReceiveData = async (byte[] data, EndPoint ep) => 
+            Socket.OnReceiveData = async (byte[] data, IPEndPoint ep) => 
             {
                 Console.WriteLine($"Received from: {ep}, message: " + ASCIIEncoding.UTF8.GetString(data));
 
@@ -43,7 +43,7 @@ namespace ReforgedNet.Server
 
                 Console.WriteLine($"Sent message: {message}, to: {ep}");
 
-                //this.Socket.DisconnectEndPoint(ep);
+                this.Socket.DisconnectEndPoint(ep);
             };
         }
 

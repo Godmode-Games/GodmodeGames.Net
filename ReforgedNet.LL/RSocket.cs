@@ -5,7 +5,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -69,7 +68,7 @@ namespace ReforgedNet.LL
         /// <summary>
         /// Datetime of last received data
         /// </summary>
-        public DateTime? LastDataReceived = null;
+        public DateTime LastDataReceived = DateTime.Now;
 
         public long TotalPacketsSent = 0;
         public long TotalPacketsLost = 0;
@@ -93,21 +92,24 @@ namespace ReforgedNet.LL
         /// <param name="data"></param>
         /// <param name="remoteEndPoint"></param>
         /// <param name="qosType"></param>
-        public void Send(ref byte[] data, EndPoint remoteEndPoint, RQoSType qosType = RQoSType.Unrealiable)
+        public void Send(ref byte[] data, IPEndPoint remoteEndPoint, RQoSType qosType = RQoSType.Unrealiable)
         {
-            RNetMessage message;
-            switch (qosType)
+            if (!_cts.Token.IsCancellationRequested)
             {
-                default:
-                case RQoSType.Realiable:
-                case RQoSType.Internal:
-                    message = new RNetMessage(data, RTransactionGenerator.GenerateId(), remoteEndPoint, qosType);
-                    break;
-                case RQoSType.Unrealiable:
-                    message = new RNetMessage(data, null, remoteEndPoint, qosType);
-                    break;
+                RNetMessage message;
+                switch (qosType)
+                {
+                    default:
+                    case RQoSType.Realiable:
+                    case RQoSType.Internal:
+                        message = new RNetMessage(data, RTransactionGenerator.GenerateId(), remoteEndPoint, qosType);
+                        break;
+                    case RQoSType.Unrealiable:
+                        message = new RNetMessage(data, null, remoteEndPoint, qosType);
+                        break;
+                }
+                _outgoingMsgQueue.Enqueue(message);
             }
-            _outgoingMsgQueue.Enqueue(message);
         }
 
         /// <summary>
@@ -121,28 +123,7 @@ namespace ReforgedNet.LL
                 {
                     // check, if the message was already received and dispatched.
                     // maybe the sender had bad ping and resend message for reliability
-                    if (netMsg.QoSType != RQoSType.Unrealiable && netMsg.TransactionId != null)
-                    {
-                        if (_lastMessagesReceived.Contains(netMsg.TransactionId.Value))
-                        {
-                            _logger?.WriteInfo(new LogInfo("skipping already received message."));
-                            continue;
-                        }
-                        _lastMessagesReceived.Add(netMsg.TransactionId.Value);
-                        if (_lastMessagesReceived.Count > _settings.StoreLastMessages)
-                        {
-                            _lastMessagesReceived.RemoveAt(0);
-                        }
-                    }
-
-                    if (netMsg.QoSType == RQoSType.Internal)
-                    {
-                        OnReceiveInternalData?.Invoke(netMsg);
-                    }
-                    else
-                    {
-                        OnReceiveData?.Invoke(netMsg.Data, (IPEndPoint)netMsg.RemoteEndPoint);
-                    }
+                    HandleIncommingMessages(netMsg);
                 }
             }
         }
@@ -153,13 +134,40 @@ namespace ReforgedNet.LL
         public void Close()
         {
             _cts.Cancel();
+            _sendTask?.Wait();
             _socket?.Close();
+        }
+
+        protected void HandleIncommingMessages(RNetMessage netMsg)
+        {
+            if (netMsg.QoSType != RQoSType.Unrealiable && netMsg.TransactionId != null)
+            {
+                if (_lastMessagesReceived.Contains(netMsg.TransactionId.Value))
+                {
+                    _logger?.WriteInfo(new LogInfo("skipping already received message."));
+                    return;
+                }
+                _lastMessagesReceived.Add(netMsg.TransactionId.Value);
+                if (_lastMessagesReceived.Count > _settings.StoreLastMessages)
+                {
+                    _lastMessagesReceived.RemoveAt(0);
+                }
+            }
+
+            if (netMsg.QoSType == RQoSType.Internal)
+            {
+                OnReceiveInternalData?.Invoke(netMsg);
+            }
+            else
+            {
+                OnReceiveData?.Invoke(netMsg.Data, (IPEndPoint)netMsg.RemoteEndPoint);
+            }
         }
 
         protected async Task SendingTask(CancellationToken cancellationToken)
         {
             DateTime startTime;
-            while (!cancellationToken.IsCancellationRequested)
+            while (!_outgoingMsgQueue.IsEmpty || !cancellationToken.IsCancellationRequested)
             {
                 // Store start date time of receiving task to calculate an accurate sending delay.
                 startTime = DateTime.Now;
@@ -179,6 +187,7 @@ namespace ReforgedNet.LL
                             _logger?.WriteError(new LogInfo("error while serializing netmessage: " + ex.Message));
                             continue;
                         }
+
                         int numOfSentBytes = _socket.SendTo(data, 0, data.Length, SocketFlags.None, netMsg.RemoteEndPoint);
 
                         if (numOfSentBytes == 0)
@@ -202,7 +211,7 @@ namespace ReforgedNet.LL
                 }
 
                 //resend unacknowledged Messages 
-                if (_socket != null && !_sentUnacknowledgedMessages.IsEmpty)
+                if (_socket != null && !_sentUnacknowledgedMessages.IsEmpty && !cancellationToken.IsCancellationRequested)
                 {
                     foreach (var unAckMsg in _sentUnacknowledgedMessages)
                     {
@@ -274,7 +283,7 @@ namespace ReforgedNet.LL
                     
                 // Nothing to do, take a short break. Delay = SendTickrateInMs - (Now - StartTime)
                 var delay = _settings.SendTickrateIsMs - (DateTime.Now.Subtract(startTime).TotalMilliseconds);
-                if (delay > 0)
+                if (!cancellationToken.IsCancellationRequested && delay > 0)
                 {
                     await Task.Delay((int)delay);
                 }
@@ -307,7 +316,7 @@ namespace ReforgedNet.LL
                         EDeserializeError deserialize_error = EDeserializeError.None;
                         try
                         {
-                            msg = _serializer.Deserialize(data, RemoteEndPoint, out deserialize_error);
+                            msg = _serializer.Deserialize(data, (IPEndPoint)RemoteEndPoint, out deserialize_error);
                         }
                         catch(Exception ex)
                         {
@@ -324,16 +333,24 @@ namespace ReforgedNet.LL
                         else if (msg.QoSType == RQoSType.Internal)
                         {
                             //Handle internal Messages instant
-                            OnReceiveInternalData?.Invoke(msg);
                             _pendingACKMessages.Enqueue(new RReliableNetMessageACK(msg.TransactionId!.Value, msg.RemoteEndPoint));
+                            HandleIncommingMessages(msg);
                         }
                         else 
                         {
-                            _incomingMsgQueue.Enqueue(msg);
                             if (msg.QoSType == RQoSType.Realiable || msg.QoSType == RQoSType.Internal)
                             {
                                 //Send ACK Message
                                 _pendingACKMessages.Enqueue(new RReliableNetMessageACK(msg.TransactionId!.Value, msg.RemoteEndPoint));
+                            }
+
+                            if (_settings.HandleMessagesInMainThread == true)
+                            {
+                                _incomingMsgQueue.Enqueue(msg);
+                            }
+                            else
+                            {
+                                HandleIncommingMessages(msg);
                             }
                         }
                     }

@@ -1,7 +1,6 @@
 ﻿using ReforgedNet.LL;
 using ReforgedNet.LL.Serialization;
 using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Text;
 using System.Threading;
@@ -27,33 +26,31 @@ namespace ReforgedNet.Client
             Socket = new RClientSocket(settings, new RByteSerialization(), null);
 
             Socket.Connected += OnConnectSuccessful;
-            Socket.Error += OnConnectFailed;
+            Socket.ConnectFailed += OnConnectFailed;
             Socket.Connect(remoteEndPoint);
             Socket.Disconnected += OnDisconnect;
             Console.WriteLine("Client started.");
         }
 
-        private void OnConnectFailed(long tid)
+        private void OnConnectFailed()
         {
             Console.WriteLine("Connection to server failed!");
         }
 
         private void OnConnectSuccessful()
         {
-            Socket.Disconnected += this.OnDisconnect;
-
             // Register receiver
-            Socket.OnReceiveData = (byte[] data, EndPoint ep) =>
+            Socket.OnReceiveData = (byte[] data, IPEndPoint ep) =>
             {
                 Console.WriteLine($"Received from: {ep}, message:" + ASCIIEncoding.UTF8.GetString(data));
-                Socket.Disconnect();
-                Console.WriteLine("closed connection");
+                //Socket.Disconnect();
+                //Console.WriteLine("closed connection");
             };
 
             Console.WriteLine("Connection to server successful.");
 
             var data = ASCIIEncoding.UTF8.GetBytes("hello-server!");
-            Socket.Send(ref data, Socket.RemoteEndPoint, RQoSType.Realiable);
+            Socket.Send(ref data, (IPEndPoint)Socket.RemoteEndPoint, RQoSType.Realiable);
         }
 
         private void OnDisconnect(EDisconnectedBy disconnected_by)

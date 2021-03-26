@@ -15,10 +15,10 @@ namespace ReforgedNet.LL
         private Dictionary<EndPoint, DateTime> _pendingDisconnects = new Dictionary<EndPoint, DateTime>();
 
         #region Events
-        public delegate void ClientDiscoverMessageHandler(EndPoint ep);
+        public delegate void ClientDiscoverMessageHandler(IPEndPoint ep);
         public event ClientDiscoverMessageHandler? ClientDiscoverMessage = null;
 
-        public delegate void ClientDisconnectHandler(EndPoint ep, bool by_client);
+        public delegate void ClientDisconnectHandler(IPEndPoint ep, bool by_client);
         public event ClientDisconnectHandler? ClientDisconnected = null;
         #endregion
 
@@ -65,7 +65,7 @@ namespace ReforgedNet.LL
                 //Client requests disconnect - send response
                 _logger?.WriteInfo(new LogInfo("Connection closed by " + message.RemoteEndPoint.ToString()));
                 discover = new RNetMessage(Encoding.UTF8.GetBytes("disconnect_response"), message.TransactionId, message.RemoteEndPoint, RQoSType.Internal);                
-                ClientDisconnected?.Invoke(message.RemoteEndPoint, true);
+                ClientDisconnected?.Invoke((IPEndPoint)message.RemoteEndPoint, true);
             }
             else if (type.Equals("disconnect_response"))
             {
@@ -74,13 +74,13 @@ namespace ReforgedNet.LL
                 {
                     _logger?.WriteInfo(new LogInfo("Connection to " + message.RemoteEndPoint + " closed by server"));
                     _pendingDisconnects.Remove(message.RemoteEndPoint);
-                    ClientDisconnected?.Invoke(message.RemoteEndPoint, false);
+                    ClientDisconnected?.Invoke((IPEndPoint)message.RemoteEndPoint, false);
                 }
             }
             else if (type.Equals("discover"))
             {
                 _logger?.WriteInfo(new LogInfo("Incomming connection from " + message.RemoteEndPoint.ToString()));
-                ClientDiscoverMessage?.Invoke(message.RemoteEndPoint);
+                ClientDiscoverMessage?.Invoke((IPEndPoint)message.RemoteEndPoint);
                 discover = new RNetMessage(Encoding.UTF8.GetBytes("discover"), message.TransactionId, message.RemoteEndPoint, RQoSType.Internal);
             }
 
@@ -90,7 +90,7 @@ namespace ReforgedNet.LL
             }
         }
 
-        public void DisconnectEndPoint(EndPoint ep)
+        public void DisconnectEndPoint(IPEndPoint ep)
         {
             if (!_pendingDisconnects.ContainsKey(ep))
             {
@@ -119,7 +119,7 @@ namespace ReforgedNet.LL
                 foreach (EndPoint ep in removeEndPoint)
                 {
                     _logger?.WriteInfo(new LogInfo("Disconnect timeout for " + ep.ToString() + " - force disconnect"));
-                    ClientDisconnected?.Invoke(ep, false);
+                    ClientDisconnected?.Invoke((IPEndPoint)ep, false);
                     _pendingDisconnects.Remove(ep);
                 }
             }

@@ -6,7 +6,7 @@ namespace ReforgedNet.LL.Serialization
 {
     public class RByteSerialization : IPacketSerializer
     {
-        public RNetMessage? Deserialize(byte[] data, EndPoint remoteEndPoint, out EDeserializeError error)
+        public RNetMessage? Deserialize(byte[] data, IPEndPoint remoteEndPoint, out EDeserializeError error)
         {
             error = EDeserializeError.None;
             int DataSize = data.Length;
