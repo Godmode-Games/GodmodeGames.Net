@@ -28,8 +28,7 @@ namespace ReforgedNet.LL.Serialization
                 return null;
             }
 
-            type = (RQoSType)BitConverter.ToInt32(data, readCursor);
-            readCursor += sizeof(int);
+            type = (RQoSType)data[readCursor++];
 
             if (readCursor > DataSize)
             {
@@ -97,7 +96,7 @@ namespace ReforgedNet.LL.Serialization
             }
 
             //QoSType
-            bytes.AddRange(BitConverter.GetBytes((int)message.QoSType));
+            bytes.Add((byte)message.QoSType);
 
             //Data
             bytes.AddRange(BitConverter.GetBytes(message.Data.Length));

@@ -4,7 +4,7 @@ using System.Text;
 
 namespace ReforgedNet.LL
 {
-    public enum RQoSType : int
+    public enum RQoSType : byte
     {
         Internal = 0,
         Unrealiable,
