@@ -20,6 +20,8 @@ namespace ReforgedNet.LL
         private long? DisconnectTransation = null;
         private bool FireDisconnectAction = false;
 
+        private bool FireConnectFailedAction = false;
+
         public bool IsConnected { get; private set; } = false;
 
         public RClientSocket(RSocketSettings settings, IPacketSerializer serializer, ILogger? logger)
@@ -36,12 +38,12 @@ namespace ReforgedNet.LL
             _sendTask = Task.Factory.StartNew(() => SendingTask(_cts.Token), _cts.Token);
             _sendTask.ConfigureAwait(false);
 
-            OnReceiveInternalData += this.OnInternalMessage;
+            OnReceiveInternalData += OnInternalMessage;
             SendHello();
         }
 
         /// <summary>
-        /// restarts receiver-/sending-task if somehow crashed
+        /// restarts receiver-/sending-task if they somehow crashed
         /// </summary>
         public override void Dispatch()
         {
@@ -63,6 +65,11 @@ namespace ReforgedNet.LL
                 Disconnected?.Invoke(EDisconnectedBy.Server);
                 Close(); // close socket
             }
+            if (FireConnectFailedAction)
+            {
+                FireConnectFailedAction = false;
+                ConnectFailed?.Invoke();
+            }
         }
 
         /// <summary>
@@ -75,7 +82,7 @@ namespace ReforgedNet.LL
             {
                 IsConnected = false;
                 Close();
-                ConnectFailed?.Invoke();
+                FireConnectFailedAction = true;
             }
         }
 
@@ -84,7 +91,7 @@ namespace ReforgedNet.LL
         /// </summary>
         public void Disconnect()
         {
-            if (this.IsConnected == false)
+            if (IsConnected == false)
             {
                 return;
             }
@@ -92,7 +99,7 @@ namespace ReforgedNet.LL
             SendDisconnect();
 
             DateTime start = DateTime.Now;
-            while (this.IsConnected != false && DateTime.Now.Subtract(start).TotalMilliseconds < 2000)
+            while (IsConnected != false && DateTime.Now.Subtract(start).TotalMilliseconds < 2000)
             {
                 Thread.Sleep(50);
             }

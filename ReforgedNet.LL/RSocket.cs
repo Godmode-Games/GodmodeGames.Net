@@ -441,15 +441,15 @@ namespace ReforgedNet.LL
             SendBytesTotal += numOfSentBytes;
 
             int curr = DateTime.Now.Second;
-            if (curr == CurrentSecondReceive)
+            if (curr == CurrentSecondSend)
             {
-                ReceiveCurrentSecond += numOfSentBytes;
+                SendCurrentSecond += numOfSentBytes;
             }
             else
             {
-                ReceiveLastSecond = ReceiveCurrentSecond;
-                ReceiveCurrentSecond = numOfSentBytes;
-                CurrentSecondReceive = curr;
+                SendLastSecond = SendCurrentSecond;
+                SendCurrentSecond = numOfSentBytes;
+                CurrentSecondSend = curr;
             }
         }
 
