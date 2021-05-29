@@ -1,4 +1,5 @@
-﻿using ReforgedNet.LL.Serialization;
+﻿using ReforgedNet.LL.Logging;
+using ReforgedNet.LL.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Net;
@@ -37,10 +38,8 @@ namespace ReforgedNet.LL
             {
                 _socket?.Bind(RemoteEndPoint);
 
-                _recvTask = Task.Factory.StartNew(() => ReceivingTask(_cts.Token), _cts.Token);
-                _recvTask.ConfigureAwait(false);
-                _sendTask = Task.Factory.StartNew(() => SendingTask(_cts.Token), _cts.Token);
-                _sendTask.ConfigureAwait(false);
+                StartReceiverTask();
+                StartSendingTask();
 
                 OnReceiveInternalData = OnInternalMessage;
             }

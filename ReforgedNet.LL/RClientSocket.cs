@@ -1,4 +1,5 @@
-﻿using ReforgedNet.LL.Serialization;
+﻿using ReforgedNet.LL.Logging;
+using ReforgedNet.LL.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Net;
@@ -35,8 +36,7 @@ namespace ReforgedNet.LL
             RemoteEndPoint = ep;
             CreateSocket();
 
-            _sendTask = Task.Factory.StartNew(() => SendingTask(_cts.Token), _cts.Token);
-            _sendTask.ConfigureAwait(false);
+            StartSendingTask();
 
             OnReceiveInternalData += OnInternalMessage;
             SendHello();
@@ -47,15 +47,13 @@ namespace ReforgedNet.LL
         /// </summary>
         public override void Dispatch()
         {
+            if (_socket == null)
+            {
+                return;
+            }
             //Keep tasks running ...
-            if (_recvTask != null && _recvTask.Status != TaskStatus.Running)
-            {
-                StartReceiverTask();
-            }
-            if (_sendTask != null && _sendTask.Status != TaskStatus.Running)
-            {
-                StartSendingTask();
-            }
+            //StartReceiverTask();
+            StartSendingTask();
 
             base.Dispatch();
 
@@ -69,6 +67,7 @@ namespace ReforgedNet.LL
             {
                 FireConnectFailedAction = false;
                 ConnectFailed?.Invoke();
+                Close(); // close socket
             }
         }
 
@@ -81,8 +80,8 @@ namespace ReforgedNet.LL
             if (tid == DiscoverTransaction)
             {
                 IsConnected = false;
-                Close();
                 FireConnectFailedAction = true;
+                Error -= OnDiscoverFailed;
             }
         }
 
@@ -114,11 +113,7 @@ namespace ReforgedNet.LL
         /// </summary>
         private void SendHello()
         {
-            //Send discover message
-            if (DiscoverTransaction == null)
-            {
-                DiscoverTransaction = RTransactionGenerator.GenerateId();
-            }
+            DiscoverTransaction = RTransactionGenerator.GenerateId();
 
             Error += OnDiscoverFailed;
 
@@ -183,11 +178,7 @@ namespace ReforgedNet.LL
         /// </summary>
         private void SendDisconnect()
         {
-            if (DisconnectTransation == null)
-            {
-                DisconnectTransation = RTransactionGenerator.GenerateId();
-            }
-
+            DisconnectTransation = RTransactionGenerator.GenerateId();
             RNetMessage disc = new RNetMessage(Encoding.UTF8.GetBytes("disconnect_request"), DisconnectTransation, RemoteEndPoint, RQoSType.Internal);
             _outgoingMsgQueue.Enqueue(disc);
         }

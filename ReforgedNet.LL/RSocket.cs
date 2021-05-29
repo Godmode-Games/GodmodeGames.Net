@@ -1,4 +1,5 @@
 ﻿using ReforgedNet.LL.Internal;
+using ReforgedNet.LL.Logging;
 using ReforgedNet.LL.Serialization;
 using System;
 using System.Collections.Concurrent;
@@ -35,7 +36,7 @@ namespace ReforgedNet.LL
         protected Socket? _socket;
         protected readonly RSocketSettings _settings;
         protected readonly IPacketSerializer _serializer;
-        protected readonly ILogger? _logger;
+        protected readonly ILogger _logger;
         public EndPoint RemoteEndPoint;
 
         protected Task? _recvTask = null;
@@ -75,7 +76,7 @@ namespace ReforgedNet.LL
         public long TotalPacketsIncomplete = 0;
         #endregion
 
-        public RSocket(RSocketSettings settings, IPEndPoint remoteEndPoint, IPacketSerializer serializer, ILogger? logger)
+        public RSocket(RSocketSettings settings, IPEndPoint remoteEndPoint, IPacketSerializer serializer, ILogger logger)
         {
             _settings = settings;
             _serializer = serializer;
@@ -94,6 +95,17 @@ namespace ReforgedNet.LL
         /// <param name="qosType"></param>
         public void Send(ref byte[] data, IPEndPoint remoteEndPoint, RQoSType qosType = RQoSType.Unrealiable)
         {
+            if (data.Length == 0)
+            {
+                _logger?.WriteError(new LogInfo("Tried to send empty message."));
+                return;
+            }
+            else if (remoteEndPoint == null)
+            {
+                _logger?.WriteError(new LogInfo("Could not send message to unknown endpoint."));
+                return;
+            }
+
             if (!_cts.Token.IsCancellationRequested)
             {
                 RNetMessage message;
@@ -144,7 +156,7 @@ namespace ReforgedNet.LL
             {
                 if (_lastMessagesReceived.Contains(netMsg.TransactionId.Value))
                 {
-                    _logger?.WriteInfo(new LogInfo("skipping already received message."));
+                    _logger?.WriteInfo(new LogInfo("skipping already received message " + netMsg.TransactionId.Value + "  " + BitConverter.ToInt32(netMsg.Data, 0)));
                     return;
                 }
                 _lastMessagesReceived.Add(netMsg.TransactionId.Value);
@@ -164,10 +176,10 @@ namespace ReforgedNet.LL
             }
         }
 
-        protected async Task SendingTask(CancellationToken cancellationToken)
+        protected void SendingTask(CancellationToken cancellationToken)
         {
             DateTime startTime;
-            while (!_outgoingMsgQueue.IsEmpty || !cancellationToken.IsCancellationRequested)
+            while (!_outgoingMsgQueue.IsEmpty || !_sentUnacknowledgedMessages.IsEmpty || !_pendingACKMessages.IsEmpty || !cancellationToken.IsCancellationRequested)
             {
                 // Store start date time of receiving task to calculate an accurate sending delay.
                 startTime = DateTime.Now;
@@ -182,7 +194,7 @@ namespace ReforgedNet.LL
                         {
                             data = _serializer.Serialize(netMsg);
                         }
-                        catch(Exception ex)
+                        catch (Exception ex)
                         {
                             _logger?.WriteError(new LogInfo("error while serializing netmessage: " + ex.Message));
                             continue;
@@ -202,6 +214,7 @@ namespace ReforgedNet.LL
                             //Start receiving...
                             StartReceiverTask();
                         }
+
 
                         if (netMsg.QoSType == RQoSType.Realiable || netMsg.QoSType == RQoSType.Internal)
                         {
@@ -246,7 +259,7 @@ namespace ReforgedNet.LL
                                 Error?.Invoke(unAckMsg.Value.TransactionId);
                                 continue;
                             }
-                                    
+
                             unAckMsg.Value.NextRetryTime = DateTime.Now.AddMilliseconds(_settings.SendRetryDelay);
                         }
                     }
@@ -267,7 +280,9 @@ namespace ReforgedNet.LL
                             _logger?.WriteError(new LogInfo("error while serializing ack message: " + ex.Message));
                             continue;
                         }
+
                         int numOfSentBytes = _socket.SendTo(data, 0, data.Length, SocketFlags.None, ackMsg.RemoteEndPoint);
+
 
                         if (numOfSentBytes == 0)
                         {
@@ -280,13 +295,14 @@ namespace ReforgedNet.LL
                         }
                     }
                 }
-                    
+
                 // Nothing to do, take a short break. Delay = SendTickrateInMs - (Now - StartTime)
                 var delay = _settings.SendTickrateIsMs - (DateTime.Now.Subtract(startTime).TotalMilliseconds);
                 if (!cancellationToken.IsCancellationRequested && delay > 0)
                 {
-                    await Task.Delay((int)delay);
+                    Thread.Sleep((int)delay);
                 }
+
             }
         }
 
@@ -296,7 +312,7 @@ namespace ReforgedNet.LL
             {
                 var data = new byte[4096];
 
-                int numOfReceivedBytes = 0;
+                int numOfReceivedBytes;
                 try
                 {
                     numOfReceivedBytes = _socket!.ReceiveFrom(data, 0, 4096, SocketFlags.None, ref RemoteEndPoint);
@@ -408,7 +424,7 @@ namespace ReforgedNet.LL
             {
                 return;
             }
-            if (_recvTask == null)
+            if (_recvTask == null || _recvTask.IsCompleted == true)
             {
                 _recvTask = Task.Factory.StartNew(() => ReceivingTask(_cts.Token), _cts.Token);
                 _recvTask.ConfigureAwait(false);
@@ -425,7 +441,7 @@ namespace ReforgedNet.LL
                 return;
             }
 
-            if (_sendTask == null)
+            if (_sendTask == null || _sendTask.IsCompleted == true)
             {
                 _sendTask = Task.Factory.StartNew(() => SendingTask(_cts.Token), _cts.Token);
                 _sendTask.ConfigureAwait(false);

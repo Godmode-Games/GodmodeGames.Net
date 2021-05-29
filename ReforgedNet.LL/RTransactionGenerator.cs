@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace ReforgedNet.LL
 {
@@ -15,7 +13,6 @@ namespace ReforgedNet.LL
         /// <returns></returns>
         public static long GenerateId()
         {
-            // TODO: replace with faster algorithm.
             byte[] buf = new byte[8];
             _rnd.NextBytes(buf);
             long longRand = BitConverter.ToInt64(buf, 0);
