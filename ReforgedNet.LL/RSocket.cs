@@ -42,6 +42,7 @@ namespace ReforgedNet.LL
         protected Task? _recvTask = null;
         protected Task? _sendTask = null;
         protected CancellationTokenSource _cts;
+        protected const int SIO_UDP_CONNRESET = -1744830452;
 
         protected List<long> _lastMessagesReceived = new List<long>();
 
@@ -145,6 +146,17 @@ namespace ReforgedNet.LL
         /// </summary>
         public void Close()
         {
+            //Empty Queue
+            while (_outgoingMsgQueue.TryDequeue(out _))
+            {
+
+            }
+            while (_pendingACKMessages.TryDequeue(out _))
+            {
+
+            }
+            _sentUnacknowledgedMessages.Clear();
+
             _cts.Cancel();
             _sendTask?.Wait();
             _socket?.Close();
@@ -200,7 +212,16 @@ namespace ReforgedNet.LL
                             continue;
                         }
 
-                        int numOfSentBytes = _socket.SendTo(data, 0, data.Length, SocketFlags.None, netMsg.RemoteEndPoint);
+                        int numOfSentBytes;
+                        try
+                        {
+                            numOfSentBytes = _socket.SendTo(data, 0, data.Length, SocketFlags.None, netMsg.RemoteEndPoint);
+                        }
+                        catch(Exception ex)
+                        {
+                            _logger?.WriteError(new LogInfo("error while sending data: " + ex.Message));
+                            continue;
+                        }
 
                         if (numOfSentBytes == 0)
                         {
@@ -255,7 +276,7 @@ namespace ReforgedNet.LL
 
                                 TotalPacketsLost++;
 
-                                _logger?.WriteError(new LogInfo(errorMsg));
+                                _logger?.WriteInfo(new LogInfo(errorMsg));
                                 Error?.Invoke(unAckMsg.Value.TransactionId);
                                 continue;
                             }
@@ -312,7 +333,7 @@ namespace ReforgedNet.LL
             {
                 var data = new byte[4096];
 
-                int numOfReceivedBytes;
+                int numOfReceivedBytes = 0;
                 try
                 {
                     numOfReceivedBytes = _socket!.ReceiveFrom(data, 0, 4096, SocketFlags.None, ref RemoteEndPoint);
@@ -387,7 +408,7 @@ namespace ReforgedNet.LL
                             if (!RemoveSentMessageFromUnacknowledgedMsgQueue(ackMsg))
                             {
                                 var errorMsg = "Can't remove non existing network message from unacknowledged message list. TransactionId: " + ackMsg.TransactionId;
-                                _logger?.WriteError(new LogInfo(errorMsg));
+                                _logger?.WriteInfo(new LogInfo(errorMsg));
                             }
                         }
                     }
@@ -413,6 +434,7 @@ namespace ReforgedNet.LL
             _socket = new Socket(RemoteEndPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
             _socket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.IPv6Only, false);
             _socket.DontFragment = true;
+            _socket.IOControl((IOControlCode)SIO_UDP_CONNRESET, new byte[] { 0, 0, 0, 0 }, null);
         }
 
         /// <summary>
