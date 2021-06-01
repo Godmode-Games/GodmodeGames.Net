@@ -432,9 +432,13 @@ namespace ReforgedNet.LL
         protected void CreateSocket()
         {
             _socket = new Socket(RemoteEndPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
-            _socket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.IPv6Only, false);
-            _socket.DontFragment = true;
-            _socket.IOControl((IOControlCode)SIO_UDP_CONNRESET, new byte[] { 0, 0, 0, 0 }, null);
+
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            {
+                _socket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.IPv6Only, false);
+                _socket.DontFragment = true;
+                _socket.IOControl((IOControlCode)SIO_UDP_CONNRESET, new byte[] { 0, 0, 0, 0 }, null);
+            }
         }
 
         /// <summary>
