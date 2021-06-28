@@ -36,8 +36,15 @@ namespace ReforgedNet.LL
             CreateSocket();
             if (_socket != null)
             {
-                _socket?.Bind(RemoteEndPoint);
-
+                try
+                {
+                    _socket?.Bind(RemoteEndPoint);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.WriteError(new LogInfo("Could not start listening on endpoint " + RemoteEndPoint + " - " + ex.Message));
+                    return;
+                }
                 StartReceiverTask();
                 StartSendingTask();
 

@@ -157,9 +157,18 @@ namespace ReforgedNet.LL
             }
             _sentUnacknowledgedMessages.Clear();
 
-            _cts.Cancel();
-            _sendTask?.Wait();
-            _socket?.Close();
+            try
+            {
+                _cts.Cancel();
+                _socket.Shutdown(SocketShutdown.Both);
+                _sendTask?.Wait(500);
+                _recvTask?.Wait(500);
+                _socket?.Close();
+            }
+            catch (TaskCanceledException)
+            {
+                
+            }
         }
 
         protected void HandleIncommingMessages(RNetMessage netMsg)
@@ -337,6 +346,15 @@ namespace ReforgedNet.LL
                 try
                 {
                     numOfReceivedBytes = _socket!.ReceiveFrom(data, 0, 4096, SocketFlags.None, ref RemoteEndPoint);
+                }
+                catch (SocketException ex)
+                {
+                    if (ex.ErrorCode == 10004)
+                    {
+                        continue;
+                    }
+                    _logger?.WriteError(new LogInfo("error while receiving data (socket): (" + ex.ErrorCode + ") " + ex.Message));
+                    continue;
                 }
                 catch (Exception ex)
                 {
