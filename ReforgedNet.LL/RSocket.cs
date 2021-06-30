@@ -160,7 +160,7 @@ namespace ReforgedNet.LL
             try
             {
                 _cts.Cancel();
-                _socket.Shutdown(SocketShutdown.Both);
+                _socket?.Shutdown(SocketShutdown.Both);
                 _sendTask?.Wait(500);
                 _recvTask?.Wait(500);
                 _socket?.Close();
@@ -340,12 +340,12 @@ namespace ReforgedNet.LL
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                var data = new byte[4096];
+                var data = new byte[8192];
 
                 int numOfReceivedBytes = 0;
                 try
                 {
-                    numOfReceivedBytes = _socket!.ReceiveFrom(data, 0, 4096, SocketFlags.None, ref RemoteEndPoint);
+                    numOfReceivedBytes = _socket!.ReceiveFrom(data, 0, 8192, SocketFlags.None, ref RemoteEndPoint);
                 }
                 catch (SocketException ex)
                 {
