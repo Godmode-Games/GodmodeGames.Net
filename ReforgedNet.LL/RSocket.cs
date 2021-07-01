@@ -340,12 +340,13 @@ namespace ReforgedNet.LL
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                var data = new byte[8192];
+                var data = new byte[_settings.BufferSize];
+                //var data = new byte[4096];
 
                 int numOfReceivedBytes = 0;
                 try
                 {
-                    numOfReceivedBytes = _socket!.ReceiveFrom(data, 0, 8192, SocketFlags.None, ref RemoteEndPoint);
+                    numOfReceivedBytes = _socket!.ReceiveFrom(data, 0, _settings.BufferSize, SocketFlags.None, ref RemoteEndPoint);
                 }
                 catch (SocketException ex)
                 {

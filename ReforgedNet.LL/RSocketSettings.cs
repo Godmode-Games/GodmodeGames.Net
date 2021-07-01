@@ -13,5 +13,7 @@
         public int StoreLastMessages = 1000;
         /// <summary> should incoming messages be handled in main-thread, or instant? </summary>
         public bool HandleMessagesInMainThread = false;
+        /// <summary> buffer-size for receiving </summary>
+        public int BufferSize = 8192;
     }
 }
