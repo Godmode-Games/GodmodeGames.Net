@@ -38,7 +38,7 @@ namespace ReforgedNet.LL
             {
                 try
                 {
-                    _socket?.Bind(RemoteEndPoint);
+                    _socket.Bind(RemoteEndPoint);
                 }
                 catch (Exception ex)
                 {

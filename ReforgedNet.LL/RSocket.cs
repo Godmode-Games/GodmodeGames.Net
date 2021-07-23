@@ -160,14 +160,22 @@ namespace ReforgedNet.LL
             try
             {
                 _cts.Cancel();
-                _socket?.Shutdown(SocketShutdown.Both);
                 _sendTask?.Wait(500);
                 _recvTask?.Wait(500);
+                //_socket?.Shutdown(SocketShutdown.Both);
                 _socket?.Close();
+            }
+            catch (SocketException)
+            {
+
             }
             catch (TaskCanceledException)
             {
                 
+            }
+            catch (Exception)
+            {
+
             }
         }
 
@@ -332,7 +340,6 @@ namespace ReforgedNet.LL
                 {
                     Thread.Sleep((int)delay);
                 }
-
             }
         }
 
@@ -455,6 +462,7 @@ namespace ReforgedNet.LL
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
                 _socket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.IPv6Only, false);
+                _socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                 _socket.DontFragment = true;
                 _socket.IOControl((IOControlCode)SIO_UDP_CONNRESET, new byte[] { 0, 0, 0, 0 }, null);
             }
