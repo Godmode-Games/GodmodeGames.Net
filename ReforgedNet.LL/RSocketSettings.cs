@@ -14,6 +14,6 @@
         /// <summary> should incoming messages be handled in main-thread, or instant? </summary>
         public bool HandleMessagesInMainThread = false;
         /// <summary> buffer-size for receiving </summary>
-        public int BufferSize = 8192;
+        public int BufferSize = 65536;
     }
 }
