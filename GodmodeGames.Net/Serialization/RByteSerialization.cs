@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Net;
 
-namespace ReforgedNet.LL.Serialization
+namespace GodmodeGames.Net.Serialization
 {
     public class RByteSerialization : IPacketSerializer
     {

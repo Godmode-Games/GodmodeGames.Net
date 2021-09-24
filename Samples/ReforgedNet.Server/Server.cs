@@ -1,13 +1,11 @@
-﻿using ReforgedNet.LL;
-using ReforgedNet.LL.Serialization;
+﻿using GodmodeGames.Net.Serialization;
 using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace ReforgedNet.Server
+namespace GodmodeGames.Net.Server
 {
     public class Server
     {

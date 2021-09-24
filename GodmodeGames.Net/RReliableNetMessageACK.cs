@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Net;
-using System.Text;
+﻿using System.Net;
 
-namespace ReforgedNet.LL
+namespace GodmodeGames.Net
 {
     /// <summary>
     /// Network message to tell notify remote endpoint of received messages.

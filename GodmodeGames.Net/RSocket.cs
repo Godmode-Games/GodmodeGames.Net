@@ -1,5 +1,5 @@
-﻿using ReforgedNet.LL.Internal;
-using ReforgedNet.LL.Serialization;
+﻿using GodmodeGames.Net.Internal;
+using GodmodeGames.Net.Serialization;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace ReforgedNet.LL
+namespace GodmodeGames.Net
 {
     /// <summary>
     /// Represents an abstract implementation of an UDP socket.

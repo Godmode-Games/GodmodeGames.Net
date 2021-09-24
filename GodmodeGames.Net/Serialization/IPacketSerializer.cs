@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Net;
-using System.Text;
+﻿using System.Net;
 
-namespace ReforgedNet.LL.Serialization
+namespace GodmodeGames.Net.Serialization
 {
     public enum EDeserializeError
     {

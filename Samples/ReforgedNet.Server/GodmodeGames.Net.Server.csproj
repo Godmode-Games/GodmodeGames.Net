@@ -3,10 +3,11 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp3.1</TargetFramework>
+    <AssemblyName>GodmodeGames.Net.Server</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\ReforgedNet.LL\ReforgedNet.LL.csproj" />
+    <ProjectReference Include="..\..\GodmodeGames.Net\GodmodeGames.Net.csproj" />
   </ItemGroup>
 
 </Project>

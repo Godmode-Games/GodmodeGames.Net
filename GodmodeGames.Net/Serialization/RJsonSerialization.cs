@@ -1,11 +1,10 @@
-﻿using Newtonsoft.Json;
+﻿using GodmodeGames.Net;
+using GodmodeGames.Net.Serialization;
 using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Text;
 
-namespace ReforgedNet.LL.Serialization
+namespace RefoGodmodeGames.Net.Serialization
 {
     public class RJsonSerialization : IPacketSerializer
     {

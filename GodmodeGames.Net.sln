@@ -3,11 +3,17 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.30804.86
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ReforgedNet.LL", "ReforgedNet.LL\ReforgedNet.LL.csproj", "{B721FFC8-5472-41FC-86EB-E3CBDB88984A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GodmodeGames.Net.Client", "Samples\ReforgedNet.Client\GodmodeGames.Net.Client.csproj", "{A7C90692-EF33-4286-B4FE-A7BA53FA11AF}"
+	ProjectSection(ProjectDependencies) = postProject
+		{B28457E9-D6DB-4503-9E73-8CA841056383} = {B28457E9-D6DB-4503-9E73-8CA841056383}
+	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReforgedNet.Client", "Samples\ReforgedNet.Client\ReforgedNet.Client.csproj", "{A7C90692-EF33-4286-B4FE-A7BA53FA11AF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GodmodeGames.Net.Server", "Samples\ReforgedNet.Server\GodmodeGames.Net.Server.csproj", "{34B24B9F-8A90-4C0D-9BEA-3CA235D52972}"
+	ProjectSection(ProjectDependencies) = postProject
+		{B28457E9-D6DB-4503-9E73-8CA841056383} = {B28457E9-D6DB-4503-9E73-8CA841056383}
+	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReforgedNet.Server", "Samples\ReforgedNet.Server\ReforgedNet.Server.csproj", "{34B24B9F-8A90-4C0D-9BEA-3CA235D52972}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GodmodeGames.Net", "GodmodeGames.Net\GodmodeGames.Net.csproj", "{B28457E9-D6DB-4503-9E73-8CA841056383}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,10 +21,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{B721FFC8-5472-41FC-86EB-E3CBDB88984A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{B721FFC8-5472-41FC-86EB-E3CBDB88984A}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{B721FFC8-5472-41FC-86EB-E3CBDB88984A}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B721FFC8-5472-41FC-86EB-E3CBDB88984A}.Release|Any CPU.Build.0 = Release|Any CPU
 		{A7C90692-EF33-4286-B4FE-A7BA53FA11AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{A7C90692-EF33-4286-B4FE-A7BA53FA11AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A7C90692-EF33-4286-B4FE-A7BA53FA11AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -27,6 +29,10 @@ Global
 		{34B24B9F-8A90-4C0D-9BEA-3CA235D52972}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{34B24B9F-8A90-4C0D-9BEA-3CA235D52972}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{34B24B9F-8A90-4C0D-9BEA-3CA235D52972}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B28457E9-D6DB-4503-9E73-8CA841056383}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B28457E9-D6DB-4503-9E73-8CA841056383}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B28457E9-D6DB-4503-9E73-8CA841056383}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B28457E9-D6DB-4503-9E73-8CA841056383}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

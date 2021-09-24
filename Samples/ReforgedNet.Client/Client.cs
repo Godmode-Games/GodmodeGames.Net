@@ -1,12 +1,10 @@
-﻿using ReforgedNet.LL;
-using ReforgedNet.LL.Serialization;
+﻿using GodmodeGames.Net.Serialization;
 using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Text;
 using System.Threading;
 
-namespace ReforgedNet.Client
+namespace GodmodeGames.Net.Client
 {
     public class Client
     {

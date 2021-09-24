@@ -1,13 +1,6 @@
-﻿using ReforgedNet.LL;
-using ReforgedNet.LL.Serialization;
-using System;
-using System.Net;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 
-namespace ReforgedNet.Client
+namespace GodmodeGames.Net.Client
 {
     class Program
     {

@@ -1,11 +1,11 @@
-﻿using ReforgedNet.LL.Serialization;
+﻿using GodmodeGames.Net.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ReforgedNet.LL
+namespace GodmodeGames.Net
 {
     public class RServerSocket : RSocket
     {

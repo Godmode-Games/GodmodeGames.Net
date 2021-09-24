@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace ReforgedNet.LL
+namespace GodmodeGames.Net
 {
     public static class RTransactionGenerator
     {

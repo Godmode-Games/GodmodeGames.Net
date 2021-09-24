@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace ReforgedNet.LL
+namespace GodmodeGames.Net
 {
     public class LogInfo
     {

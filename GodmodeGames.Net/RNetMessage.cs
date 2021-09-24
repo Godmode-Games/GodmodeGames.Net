@@ -1,11 +1,8 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.Net;
-using System.Text;
 
 #nullable enable
-namespace ReforgedNet.LL
+namespace GodmodeGames.Net
 {
     /// <summary>
     /// Holds information about network message.
