@@ -1,9 +1,9 @@
-﻿using GodmodeGames.Net.Serialization;
+﻿using GodmodeGames.Net.Logging;
+using GodmodeGames.Net.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace GodmodeGames.Net
 {
@@ -15,10 +15,10 @@ namespace GodmodeGames.Net
         private Dictionary<EndPoint, DateTime> _pendingDisconnects = new Dictionary<EndPoint, DateTime>();
 
         #region Events
-        public delegate void ClientDiscoverMessageHandler(EndPoint ep);
+        public delegate void ClientDiscoverMessageHandler(IPEndPoint ep);
         public event ClientDiscoverMessageHandler? ClientDiscoverMessage = null;
 
-        public delegate void ClientDisconnectHandler(EndPoint ep, bool by_client);
+        public delegate void ClientDisconnectHandler(IPEndPoint ep, bool by_client);
         public event ClientDisconnectHandler? ClientDisconnected = null;
         #endregion
 
@@ -35,12 +35,17 @@ namespace GodmodeGames.Net
             CreateSocket();
             if (_socket != null)
             {
-                _socket?.Bind(RemoteEndPoint);
-
-                _recvTask = Task.Factory.StartNew(() => ReceivingTask(_cts.Token), _cts.Token);
-                _recvTask.ConfigureAwait(false);
-                _sendTask = Task.Factory.StartNew(() => SendingTask(_cts.Token), _cts.Token);
-                _sendTask.ConfigureAwait(false);
+                try
+                {
+                    _socket.Bind(RemoteEndPoint);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.WriteError(new LogInfo("Could not start listening on endpoint " + RemoteEndPoint + " - " + ex.Message));
+                    return;
+                }
+                StartReceiverTask();
+                StartSendingTask();
 
                 OnReceiveInternalData = OnInternalMessage;
             }
@@ -65,7 +70,7 @@ namespace GodmodeGames.Net
                 //Client requests disconnect - send response
                 _logger?.WriteInfo(new LogInfo("Connection closed by " + message.RemoteEndPoint.ToString()));
                 discover = new RNetMessage(Encoding.UTF8.GetBytes("disconnect_response"), message.TransactionId, message.RemoteEndPoint, RQoSType.Internal);                
-                ClientDisconnected?.Invoke(message.RemoteEndPoint, true);
+                ClientDisconnected?.Invoke((IPEndPoint)message.RemoteEndPoint, true);
             }
             else if (type.Equals("disconnect_response"))
             {
@@ -74,13 +79,13 @@ namespace GodmodeGames.Net
                 {
                     _logger?.WriteInfo(new LogInfo("Connection to " + message.RemoteEndPoint + " closed by server"));
                     _pendingDisconnects.Remove(message.RemoteEndPoint);
-                    ClientDisconnected?.Invoke(message.RemoteEndPoint, false);
+                    ClientDisconnected?.Invoke((IPEndPoint)message.RemoteEndPoint, false);
                 }
             }
             else if (type.Equals("discover"))
             {
                 _logger?.WriteInfo(new LogInfo("Incomming connection from " + message.RemoteEndPoint.ToString()));
-                ClientDiscoverMessage?.Invoke(message.RemoteEndPoint);
+                ClientDiscoverMessage?.Invoke((IPEndPoint)message.RemoteEndPoint);
                 discover = new RNetMessage(Encoding.UTF8.GetBytes("discover"), message.TransactionId, message.RemoteEndPoint, RQoSType.Internal);
             }
 
@@ -90,7 +95,7 @@ namespace GodmodeGames.Net
             }
         }
 
-        public void DisconnectEndPoint(EndPoint ep)
+        public void DisconnectEndPoint(IPEndPoint ep)
         {
             if (!_pendingDisconnects.ContainsKey(ep))
             {
@@ -119,7 +124,7 @@ namespace GodmodeGames.Net
                 foreach (EndPoint ep in removeEndPoint)
                 {
                     _logger?.WriteInfo(new LogInfo("Disconnect timeout for " + ep.ToString() + " - force disconnect"));
-                    ClientDisconnected?.Invoke(ep, false);
+                    ClientDisconnected?.Invoke((IPEndPoint)ep, false);
                     _pendingDisconnects.Remove(ep);
                 }
             }

@@ -11,5 +11,9 @@
         public int PendingDisconnectTimeout = 1000;
         /// <summary>how many transaction-ids should be stored, preventing double send reliable messages on bad ping</summary>
         public int StoreLastMessages = 1000;
+        /// <summary> should incoming messages be handled in main-thread, or instant? </summary>
+        public bool HandleMessagesInMainThread = false;
+        /// <summary> buffer-size for receiving </summary>
+        public int BufferSize = 65536;
     }
 }

@@ -1,6 +1,6 @@
 ﻿namespace GodmodeGames.Net
 {
-    public enum RQoSType : int
+    public enum RQoSType : byte
     {
         Internal = 0,
         Unrealiable,

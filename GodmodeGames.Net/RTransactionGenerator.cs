@@ -13,7 +13,6 @@ namespace GodmodeGames.Net
         /// <returns></returns>
         public static long GenerateId()
         {
-            // TODO: replace with faster algorithm.
             byte[] buf = new byte[8];
             _rnd.NextBytes(buf);
             long longRand = BitConverter.ToInt64(buf, 0);

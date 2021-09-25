@@ -1,10 +1,8 @@
-﻿using GodmodeGames.Net;
-using GodmodeGames.Net.Serialization;
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json.Linq;
 using System.Net;
 using System.Text;
 
-namespace RefoGodmodeGames.Net.Serialization
+namespace GodmodeGames.Net.Serialization
 {
     public class RJsonSerialization : IPacketSerializer
     {
@@ -44,7 +42,7 @@ namespace RefoGodmodeGames.Net.Serialization
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public RNetMessage? Deserialize(byte[] data, EndPoint remoteEndPoint, out EDeserializeError error)
+        public RNetMessage? Deserialize(byte[] data, IPEndPoint remoteEndPoint, out EDeserializeError error)
         {
             error = EDeserializeError.None;
             try

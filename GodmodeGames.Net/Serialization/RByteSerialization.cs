@@ -6,7 +6,7 @@ namespace GodmodeGames.Net.Serialization
 {
     public class RByteSerialization : IPacketSerializer
     {
-        public RNetMessage? Deserialize(byte[] data, EndPoint remoteEndPoint, out EDeserializeError error)
+        public RNetMessage? Deserialize(byte[] data, IPEndPoint remoteEndPoint, out EDeserializeError error)
         {
             error = EDeserializeError.None;
             int DataSize = data.Length;
@@ -28,8 +28,7 @@ namespace GodmodeGames.Net.Serialization
                 return null;
             }
 
-            type = (RQoSType)BitConverter.ToInt32(data, readCursor);
-            readCursor += sizeof(int);
+            type = (RQoSType)data[readCursor++];
 
             if (readCursor > DataSize)
             {
@@ -97,7 +96,7 @@ namespace GodmodeGames.Net.Serialization
             }
 
             //QoSType
-            bytes.AddRange(BitConverter.GetBytes((int)message.QoSType));
+            bytes.Add((byte)message.QoSType);
 
             //Data
             bytes.AddRange(BitConverter.GetBytes(message.Data.Length));

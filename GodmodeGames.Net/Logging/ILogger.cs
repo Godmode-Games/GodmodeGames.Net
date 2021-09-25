@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace GodmodeGames.Net
+namespace GodmodeGames.Net.Logging
 {
     public class LogInfo
     {

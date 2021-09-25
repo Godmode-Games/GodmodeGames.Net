@@ -1,20 +1,26 @@
-﻿using GodmodeGames.Net.Serialization;
+﻿using GodmodeGames.Net.Logging;
+using GodmodeGames.Net.Serialization;
 using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Text;
-using System.Threading.Tasks;
+using System.Threading;
 
 namespace GodmodeGames.Net
 {
     public class RClientSocket : RSocket
     {
+        public enum EDisconnectedBy { Client, Server, Timeout }
+
         public Action? Connected;
         public Action? ConnectFailed;
-        public Action<bool>? Disconnected;
+        public Action<EDisconnectedBy>? Disconnected;
 
         private long? DiscoverTransaction = null;
         private long? DisconnectTransation = null;
+        private bool FireDisconnectAction = false;
+
+        private bool FireConnectFailedAction = false;
+
         public bool IsConnected { get; private set; } = false;
 
         public RClientSocket(RSocketSettings settings, IPacketSerializer serializer, ILogger? logger)
@@ -28,29 +34,39 @@ namespace GodmodeGames.Net
             RemoteEndPoint = ep;
             CreateSocket();
 
-            _sendTask = Task.Factory.StartNew(() => SendingTask(_cts.Token), _cts.Token);
-            _sendTask.ConfigureAwait(false);
+            StartSendingTask();
 
-            OnReceiveInternalData += this.OnInternalMessage;
+            OnReceiveInternalData += OnInternalMessage;
             SendHello();
         }
 
         /// <summary>
-        /// restarts receiver-/sending-task if somehow crashed
+        /// restarts receiver-/sending-task if they somehow crashed
         /// </summary>
         public override void Dispatch()
         {
+            if (_socket == null)
+            {
+                return;
+            }
             //Keep tasks running ...
-            if (_recvTask != null && _recvTask.Status != TaskStatus.Running)
-            {
-                StartReceiverTask();
-            }
-            if (_sendTask != null && _sendTask.Status != TaskStatus.Running)
-            {
-                StartSendingTask();
-            }
+            //StartReceiverTask();
+            StartSendingTask();
 
             base.Dispatch();
+
+            if (FireDisconnectAction) //invoke in main thread
+            {
+                FireDisconnectAction = false;
+                Disconnected?.Invoke(EDisconnectedBy.Server);
+                Close(); // close socket
+            }
+            if (FireConnectFailedAction)
+            {
+                FireConnectFailedAction = false;
+                ConnectFailed?.Invoke();
+                Close(); // close socket
+            }
         }
 
         /// <summary>
@@ -62,20 +78,32 @@ namespace GodmodeGames.Net
             if (tid == DiscoverTransaction)
             {
                 IsConnected = false;
-                ConnectFailed?.Invoke();
+                FireConnectFailedAction = true;
+                Error -= OnDiscoverFailed;
             }
         }
 
         /// <summary>
         /// Close connection
         /// </summary>
-        public void Disconnect(Action<bool>? disconnectCallback = null)
+        public void Disconnect()
         {
-            if (disconnectCallback != null)
+            if (IsConnected == false)
             {
-                Disconnected += disconnectCallback;
+                return;
             }
+
             SendDisconnect();
+
+            DateTime start = DateTime.Now;
+            while (IsConnected != false && DateTime.Now.Subtract(start).TotalMilliseconds < 2000)
+            {
+                Thread.Sleep(50);
+            }
+
+            Close(); //close socket
+
+            Disconnected?.Invoke(EDisconnectedBy.Client);
         }
 
         /// <summary>
@@ -83,11 +111,7 @@ namespace GodmodeGames.Net
         /// </summary>
         private void SendHello()
         {
-            //Send discover message
-            if (DiscoverTransaction == null)
-            {
-                DiscoverTransaction = RTransactionGenerator.GenerateId();
-            }
+            DiscoverTransaction = RTransactionGenerator.GenerateId();
 
             Error += OnDiscoverFailed;
 
@@ -120,13 +144,10 @@ namespace GodmodeGames.Net
 
             if (type.Equals("disconnect_response") && IsConnected && DisconnectTransation == message.TransactionId)
             {
-                //Disconnect answer from server
+                //Disconnect answer from server - Action invoked in Disconnect-Method
                 _logger?.WriteInfo(new LogInfo("Disconnect successful"));
                 IsConnected = false;
                 DisconnectTransation = null;
-
-                Disconnected?.Invoke(true);
-                Error -= OnDisconnectFailed; //Clear all discover-fails
             }
             else if (type.Equals("disconnect_request") && IsConnected)
             {
@@ -136,7 +157,7 @@ namespace GodmodeGames.Net
 
                 IsConnected = false;
                 DisconnectTransation = null;
-                Disconnected?.Invoke(false);
+                FireDisconnectAction = true; //Invoke action in Dispatch-method (on main thread)
             }
             else if (type.Equals("discover") && !IsConnected && DiscoverTransaction == message.TransactionId)
             {
@@ -155,29 +176,9 @@ namespace GodmodeGames.Net
         /// </summary>
         private void SendDisconnect()
         {
-            if (DisconnectTransation == null)
-            {
-                DisconnectTransation = RTransactionGenerator.GenerateId();
-            }
-
-            Error += OnDisconnectFailed;
+            DisconnectTransation = RTransactionGenerator.GenerateId();
             RNetMessage disc = new RNetMessage(Encoding.UTF8.GetBytes("disconnect_request"), DisconnectTransation, RemoteEndPoint, RQoSType.Internal);
             _outgoingMsgQueue.Enqueue(disc);
-        }
-
-        /// <summary>
-        /// Disconnect failed, never the less disconnect
-        /// </summary>
-        private void OnDisconnectFailed(long tid)
-        {
-            if (tid == DisconnectTransation)
-            {
-                _logger?.WriteInfo(new LogInfo("Disconnect failed, cancel connection anyways"));
-                IsConnected = false;
-                DisconnectTransation = null;
-
-                Disconnected?.Invoke(false);
-            }
         }
     }
 }
