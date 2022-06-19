@@ -130,7 +130,6 @@ namespace GodmodeGames.Net
                 //not the server...
                 return;
             }
-
             string type = "discover";
             try
             {

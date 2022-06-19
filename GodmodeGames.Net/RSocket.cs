@@ -153,7 +153,7 @@ namespace GodmodeGames.Net
             }
             while (_pendingACKMessages.TryDequeue(out _))
             {
-
+                
             }
             _sentUnacknowledgedMessages.Clear();
 

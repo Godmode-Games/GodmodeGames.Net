@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Text;
+using System.Threading;
 
 namespace GodmodeGames.Net
 {
@@ -49,6 +50,25 @@ namespace GodmodeGames.Net
 
                 OnReceiveInternalData = OnInternalMessage;
             }
+        }
+
+        public new void Close()
+        {
+            //Wait 1 sec for all clients to receive disconnect message
+            DateTime now = DateTime.Now;
+            while (this._pendingDisconnects.Count > 0)
+            {
+                if (DateTime.Now.Subtract(now).TotalMilliseconds > 1000)
+                {
+                    break;
+                }
+                else
+                {
+                    Thread.Sleep(50);
+                }
+            }
+
+            base.Close();
         }
 
         private void OnInternalMessage(RNetMessage message)
@@ -99,6 +119,7 @@ namespace GodmodeGames.Net
         {
             if (!_pendingDisconnects.ContainsKey(ep))
             {
+                this._logger?.WriteInfo(new LogInfo("disconnect client..."));
                 RNetMessage disc = new RNetMessage(Encoding.UTF8.GetBytes("disconnect_request"), RTransactionGenerator.GenerateId(), ep, RQoSType.Internal);
                 _pendingDisconnects.Add(ep, DateTime.Now);
                 _outgoingMsgQueue.Enqueue(disc);
