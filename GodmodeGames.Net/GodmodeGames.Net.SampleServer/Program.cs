@@ -1,5 +1,5 @@
 ﻿//#define GG_SERVER_DISCONNECT //should the server disconnect clients after 5 seconds?
-#define GG_SERVER_SHUTDOWN //shut down server after 5 seconds?
+//#define GG_SERVER_SHUTDOWN //shut down server after 5 seconds?
 
 using GodmodeGames.Net.Logging;
 using GodmodeGames.Net.Settings;
@@ -44,7 +44,6 @@ namespace GodmodeGames.Net.SampleServer
                     }
                 }
 #endif
-
                 await Task.Delay(50);
             }
         }

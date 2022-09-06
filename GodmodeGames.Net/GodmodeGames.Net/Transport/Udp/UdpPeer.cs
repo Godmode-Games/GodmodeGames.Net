@@ -1,7 +1,7 @@
 ﻿using System.Net.Sockets;
 using System.Threading.Tasks;
 using System.Threading;
-using static GodmodeGames.Net.Transport.Udp.Message;
+using static GodmodeGames.Net.Transport.Message;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -70,9 +70,9 @@ namespace GodmodeGames.Net.Transport.Udp
             this.OutgoingMessages.Enqueue(msg);
         }
 
-        protected abstract void UpdateStatisticsReceive(int bytes);
-        protected abstract void UpdateStatisticsSent(int bytes);
-        protected abstract void UpdatePacketLost();
+        protected abstract void UpdateStatisticsReceive(int bytes, IPEndPoint endpoint);
+        protected abstract void UpdateStatisticsSent(int bytes, IPEndPoint endpoint);
+        protected abstract void UpdatePacketLost(IPEndPoint endpoint);
         protected abstract void PacketLost(AckMessage message);
         protected abstract void ConnectionFailed(IPEndPoint endpoint);
         protected abstract void ReceivedInternalMessage(Message msg);
@@ -119,7 +119,7 @@ namespace GodmodeGames.Net.Transport.Udp
 
                         if (numOfReceivedBytes > 0)
                         {
-                            this.UpdateStatisticsReceive(numOfReceivedBytes);
+                            this.UpdateStatisticsReceive(numOfReceivedBytes, (IPEndPoint)endPoint);
 
                             Message msg = new Message();
                             if (msg.Deserialize(data.Take(numOfReceivedBytes).ToArray(), (IPEndPoint)endPoint))
@@ -201,7 +201,7 @@ namespace GodmodeGames.Net.Transport.Udp
                             {
                                 if (kvp.Value.LastTryTime.AddMilliseconds(this.SocketSettings.UdpReliableResendTime) < DateTime.UtcNow)
                                 {
-                                    this.UpdatePacketLost();
+                                    this.UpdatePacketLost(kvp.Value.RemoteEndpoint);
 
                                     if (kvp.Value.RetryTimes > this.SocketSettings.UdpResendTries)
                                     {
@@ -226,7 +226,7 @@ namespace GodmodeGames.Net.Transport.Udp
                                         kvp.Value.RetryTimes++;
                                         kvp.Value.LastTryTime = DateTime.UtcNow;
 
-                                        this.UpdateStatisticsSent(numOfSentBytes);
+                                        this.UpdateStatisticsSent(numOfSentBytes, kvp.Value.RemoteEndpoint);
                                     }
                                 }
                             }
@@ -277,7 +277,7 @@ namespace GodmodeGames.Net.Transport.Udp
             else
             {
                 //update statistics...
-                this.UpdateStatisticsSent(numOfSentBytes);
+                this.UpdateStatisticsSent(numOfSentBytes, msg.RemoteEndpoint);
                 this.StartReceivingTask();
             }
 

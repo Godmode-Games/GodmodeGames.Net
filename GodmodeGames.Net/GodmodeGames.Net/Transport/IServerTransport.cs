@@ -1,7 +1,7 @@
 ﻿using GodmodeGames.Net.Logging;
 using GodmodeGames.Net.Settings;
 using GodmodeGames.Net.Transport.Statistics;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Net;
 
 namespace GodmodeGames.Net.Transport
@@ -30,7 +30,7 @@ namespace GodmodeGames.Net.Transport
         /// <summary>
         /// Connections a the transport layer
         /// </summary>
-        Dictionary<IPEndPoint,GGConnection> Connections { get; set; }
+        ConcurrentDictionary<IPEndPoint,GGConnection> Connections { get; set; }
 
         /// <summary>
         /// Initialize the socket

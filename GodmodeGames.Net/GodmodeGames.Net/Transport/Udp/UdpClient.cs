@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading;
 using static GodmodeGames.Net.GGClient;
 using static GodmodeGames.Net.Transport.IClientTransport;
-using static GodmodeGames.Net.Transport.Udp.Message;
+using static GodmodeGames.Net.Transport.Message;
 
 namespace GodmodeGames.Net.Transport.Udp
 {
@@ -22,6 +22,8 @@ namespace GodmodeGames.Net.Transport.Udp
         private List<int> ReceivedMessagesBuffer = new List<int>();
 
         private string DisconnectReason = null;
+
+        public int RTT { get; set; } = -1;
 
         #region Events
         public event ReceiveDataHandler ReceivedData;
@@ -147,6 +149,12 @@ namespace GodmodeGames.Net.Transport.Udp
             {
                 tick.OnTick?.Invoke();
             }
+
+            if (DateTime.UtcNow.Subtract(this.Statistics.LastDataReceived).TotalSeconds > this.SocketSettings.TimeoutTime)
+            {
+                this.StopReceive();
+                this.Disconnected?.Invoke(EDisconnectBy.ConnectionLost, "timeout");
+            }
         }
 
         /// <summary>
@@ -262,21 +270,6 @@ namespace GodmodeGames.Net.Transport.Udp
         /// <param name="msg"></param>
         protected override void ReceivedInternalMessage(Message msg)
         {
-            //called async in receiver task
-            /*if (this.ReceivedMessagesBuffer.Contains(msg.MessageId))
-            {
-                this.Logger?.LogInfo("Skipping already received internal message " + msg.MessageType);
-                return;
-            }
-            else
-            {
-                this.ReceivedMessagesBuffer.Add(msg.MessageId);
-                if (this.ReceivedMessagesBuffer.Count > this.SocketSettings.UdpDublicateMessagesBuffer)
-                {
-                    this.ReceivedMessagesBuffer.RemoveAt(0);
-                }
-            }*/
-
             //internal messagess
             if (msg.MessageType == EMessageType.DiscoverResponse && this.ConnectionStatus == EConnectionStatus.Connecting)
             {
@@ -317,6 +310,16 @@ namespace GodmodeGames.Net.Transport.Udp
                     }
                 });
             }
+            else if (msg.MessageType == EMessageType.HeartBeat)
+            {
+                int ping = -1;
+                if (msg.Data.Length >= 4)
+                {
+                    ping = BitConverter.ToInt32(msg.Data);
+                }
+                this.RTT = ping;
+                this.Logger?.LogInfo("My ping is " + ping);
+            }
         }
 
         /// <summary>
@@ -345,7 +348,7 @@ namespace GodmodeGames.Net.Transport.Udp
         /// update the received-statistics
         /// </summary>
         /// <param name="bytes"></param>
-        protected override void UpdateStatisticsReceive(int bytes)
+        protected override void UpdateStatisticsReceive(int bytes, IPEndPoint endpoint)
         {
             this.Statistics.UpdateReceiveStatistics(bytes);
         }
@@ -354,7 +357,7 @@ namespace GodmodeGames.Net.Transport.Udp
         /// update the sent-statistics
         /// </summary>
         /// <param name="bytes"></param>
-        protected override void UpdateStatisticsSent(int bytes)
+        protected override void UpdateStatisticsSent(int bytes, IPEndPoint endpoint)
         {
             this.Statistics.UpdateSentStatistics(bytes);
         }
@@ -362,7 +365,7 @@ namespace GodmodeGames.Net.Transport.Udp
         /// <summary>
         /// update the statistic, because a packet was lost
         /// </summary>
-        protected override void UpdatePacketLost()
+        protected override void UpdatePacketLost(IPEndPoint endpoint)
         {
             this.Statistics.UpdatePacketLost();
         }

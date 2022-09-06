@@ -1,7 +1,9 @@
 ﻿using GodmodeGames.Net.Logging;
 using GodmodeGames.Net.Settings;
 using GodmodeGames.Net.Transport;
+using GodmodeGames.Net.Transport.Statistics;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
 using static GodmodeGames.Net.Transport.IServerTransport;
@@ -21,11 +23,15 @@ namespace GodmodeGames.Net
         /// <summary>
         /// Connected clients
         /// </summary>
-        public Dictionary<IPEndPoint, GGConnection> Connections => this.Transport.Connections;
+        public ConcurrentDictionary<IPEndPoint, GGConnection> Connections => this.Transport.Connections;
         /// <summary>
         /// Is the server running?
         /// </summary>
         public bool IsListening => this.Transport != null ? this.Transport.ListeningStatus == EListeningStatus.Listening : false;
+        /// <summary>
+        /// Server statistics
+        /// </summary>
+        public ServerStatistics Statistics => this.Transport?.Statistics;
 
         #region Events
         public delegate void ClientConnectHandler(GGConnection connection);

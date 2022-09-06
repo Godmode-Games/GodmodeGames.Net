@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 
-namespace GodmodeGames.Net.Transport.Udp
+namespace GodmodeGames.Net.Transport
 {
     internal class Message : IEquatable<Message>
     {
@@ -21,10 +21,10 @@ namespace GodmodeGames.Net.Transport.Udp
 
         public Message(byte[] data, int messageid, IPEndPoint endpoint, EMessageType type)
         {
-            this.Data = data;
-            this.MessageId = messageid;
-            this.MessageType = type;
-            this.RemoteEndpoint = endpoint;
+            Data = data;
+            MessageId = messageid;
+            MessageType = type;
+            RemoteEndpoint = endpoint;
         }
 
         /// <summary>
@@ -40,17 +40,17 @@ namespace GodmodeGames.Net.Transport.Udp
                 return false;
             }
 
-            this.MessageType = (EMessageType)data[0];
-            this.MessageId = BitConverter.ToInt32(data, 1);
-            this.RemoteEndpoint = endpoint;
+            MessageType = (EMessageType)data[0];
+            MessageId = BitConverter.ToInt32(data, 1);
+            RemoteEndpoint = endpoint;
 
             if (data.Length > 5)
             {
-                this.Data = data.Skip(5).ToArray();
+                Data = data.Skip(5).ToArray();
             }
             else
             {
-                this.Data = new byte[0];
+                Data = new byte[0];
             }
 
             return true;
@@ -63,11 +63,11 @@ namespace GodmodeGames.Net.Transport.Udp
         public byte[] Serialize()
         {
             List<byte> ret = new List<byte>();
-            ret.Add((byte)this.MessageType);
-            ret.AddRange(BitConverter.GetBytes(this.MessageId));
-            if (this.Data.Length > 0)
+            ret.Add((byte)MessageType);
+            ret.AddRange(BitConverter.GetBytes(MessageId));
+            if (Data.Length > 0)
             {
-                ret.AddRange(this.Data);
+                ret.AddRange(Data);
             }
 
             return ret.ToArray();
@@ -75,7 +75,7 @@ namespace GodmodeGames.Net.Transport.Udp
 
         public bool Equals(Message other)
         {
-            return this.MessageType == other.MessageType && this.Data == other.Data && this.MessageId == other.MessageId && this.RemoteEndpoint == other.RemoteEndpoint;
+            return this.MessageType == other.MessageType && this.MessageId == other.MessageId && this.RemoteEndpoint == other.RemoteEndpoint && this.Data == other.Data;
         }
     }
 }

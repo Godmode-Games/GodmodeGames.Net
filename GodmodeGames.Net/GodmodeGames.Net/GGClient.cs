@@ -1,9 +1,9 @@
 ﻿using GodmodeGames.Net.Logging;
 using GodmodeGames.Net.Settings;
 using GodmodeGames.Net.Transport;
+using GodmodeGames.Net.Transport.Statistics;
 using System;
 using System.Net;
-using System.Security.Cryptography.X509Certificates;
 using static GodmodeGames.Net.Transport.IClientTransport;
 
 namespace GodmodeGames.Net
@@ -37,6 +37,14 @@ namespace GodmodeGames.Net
         /// is the client connected to server
         /// </summary>
         public bool IsConnected => this.Transport != null ? this.Transport.ConnectionStatus == EConnectionStatus.Connected : false;
+        /// <summary>
+        /// Client statistics
+        /// </summary>
+        public ClientStatistics Statistics => this.Transport?.Statistics;
+        /// <summary>
+        /// last ping-time of the connection
+        /// </summary>
+        public int Ping => this.Transport != null ? this.Transport.RTT : -1;
 
         public GGClient(ClientSocketSettings settings = null, ILogger logger = null)
         {

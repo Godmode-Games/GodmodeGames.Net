@@ -13,10 +13,6 @@
         /// </summary>
         public ushort TimeoutTime = 20000;
         /// <summary>
-        /// how often is the heartbeat send
-        /// </summary>
-        public ushort HeartbeatInterval = 5000;
-        /// <summary>
         /// Sleep-time for sending task, when queue is empty, in milliseconds
         /// </summary>
         public ushort SendTickrate = 10;

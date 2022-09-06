@@ -1,7 +1,6 @@
 ﻿using GodmodeGames.Net.Logging;
 using GodmodeGames.Net.Settings;
 using GodmodeGames.Net.Transport.Statistics;
-using System;
 using System.Net;
 using static GodmodeGames.Net.GGClient;
 
@@ -13,7 +12,10 @@ namespace GodmodeGames.Net.Transport
         
         public enum EConnectionStatus : byte { NotConnected, Connecting, Connected, Disconnecting, Disconnected }
         EConnectionStatus ConnectionStatus { get; set; }
-
+        /// <summary>
+        /// Round Trip Time (Ping)
+        /// </summary>
+        int RTT { get; set; }
         /// <summary>
         /// Initialize client transport layer
         /// </summary>

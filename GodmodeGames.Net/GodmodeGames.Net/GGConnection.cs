@@ -1,8 +1,10 @@
 ﻿using GodmodeGames.Net.Logging;
 using GodmodeGames.Net.Settings;
 using GodmodeGames.Net.Transport;
+using GodmodeGames.Net.Transport.Statistics;
 using GodmodeGames.Net.Transport.Udp;
 using System;
+using System.Diagnostics;
 using System.Net;
 
 namespace GodmodeGames.Net
@@ -22,9 +24,28 @@ namespace GodmodeGames.Net
         /// </summary>
         public IPEndPoint ClientEndpoint = null;
         /// <summary>
+        /// Statistics of the connection
+        /// </summary>
+        public ClientStatistics Statistics = new ClientStatistics();
+        /// <summary>
         /// Transport layer 
         /// </summary>
         internal IConnectionTransport Transport = null;
+        /// <summary>
+        /// When was the last heartbeat sent?
+        /// </summary>
+        internal DateTime LastHeartbeat = DateTime.UtcNow;
+        /// <summary>
+        /// Internal message of the last heartbeat-message
+        /// </summary>
+        internal int LastHeartbeatId = -1;
+        /// <summary>
+        /// stopwatch to calcualte rtt
+        /// </summary>
+        private Stopwatch HeartbeatStopwatch = new Stopwatch();
+        /// Current Ping of the client
+        /// </summary>
+        public int RTT = -1;
 
         internal GGConnection(IServerTransport servertransport, ServerSocketSettings settings, ILogger logger, IPEndPoint endpoint)
         {
@@ -32,6 +53,8 @@ namespace GodmodeGames.Net
             this.Settings = settings;
             this.Logger = logger;
             this.ClientEndpoint = endpoint;
+            this.LastHeartbeat = DateTime.UtcNow;
+            this.HeartbeatStopwatch = new Stopwatch();
 
             if (servertransport is UdpServerListener)
             {
@@ -60,6 +83,27 @@ namespace GodmodeGames.Net
         public void Send(byte[] data, bool reliable)
         {
             this.ServerTransport.Send(data, this, reliable);
+        }
+
+        internal void StartHeartbeat(int messageid)
+        {
+            this.LastHeartbeatId = messageid;
+            this.LastHeartbeat = DateTime.UtcNow;
+            this.HeartbeatStopwatch.Restart();
+        }
+
+        internal void HeartbeatResponseReceived(int id)
+        {
+            if (this.LastHeartbeatId == id)
+            {
+                this.HeartbeatStopwatch.Stop();
+                this.RTT = (int)this.HeartbeatStopwatch.ElapsedMilliseconds;
+
+                this.Logger?.LogInfo("RTT for " + this.ClientEndpoint + ": " + this.RTT);
+
+                this.LastHeartbeatId = -1;
+                this.LastHeartbeat = DateTime.UtcNow;
+            }
         }
     }
 }

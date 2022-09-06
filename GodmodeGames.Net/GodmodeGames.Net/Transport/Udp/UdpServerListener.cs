@@ -8,7 +8,7 @@ using GodmodeGames.Net.Logging;
 using GodmodeGames.Net.Settings;
 using GodmodeGames.Net.Transport.Statistics;
 using static GodmodeGames.Net.Transport.IServerTransport;
-using static GodmodeGames.Net.Transport.Udp.Message;
+using static GodmodeGames.Net.Transport.Message;
 
 namespace GodmodeGames.Net.Transport.Udp
 {
@@ -17,7 +17,7 @@ namespace GodmodeGames.Net.Transport.Udp
         public EListeningStatus ListeningStatus { get; set; }
 
         public ServerStatistics Statistics { get; set; } = new ServerStatistics();
-        public Dictionary<IPEndPoint, GGConnection> Connections { get; set; } = new Dictionary<IPEndPoint, GGConnection>();
+        public ConcurrentDictionary<IPEndPoint, GGConnection> Connections { get; set; } = new ConcurrentDictionary<IPEndPoint, GGConnection>();
 
         private ConcurrentDictionary<GGConnection, PendingDisconnect> PendingDisconnects = new ConcurrentDictionary<GGConnection, PendingDisconnect>();
 
@@ -96,11 +96,46 @@ namespace GodmodeGames.Net.Transport.Udp
         {
             this.DispatchMessages();
 
+            //invoke Tick events
             while (this.TickEvents.TryDequeue(out TickEvent tick))
             {
                 tick.OnTick?.Invoke();
             }
 
+            List<KeyValuePair<IPEndPoint, GGConnection>> timeout = new List<KeyValuePair<IPEndPoint, GGConnection>>();
+            int heartbeat = ((ServerSocketSettings)this.SocketSettings).HeartbeatInterval;
+            //disconnect timed out connections and send heartbeat
+            foreach (KeyValuePair<IPEndPoint, GGConnection> kvp in this.Connections)
+            {
+                if (kvp.Value.Statistics.LastDataReceived.AddMilliseconds(this.SocketSettings.TimeoutTime) < DateTime.UtcNow)
+                {
+                    timeout.Add(kvp);
+                }
+
+                if (kvp.Value.LastHeartbeat.AddMilliseconds(heartbeat) < DateTime.UtcNow)
+                {
+                    Message msg = new Message
+                    {
+                        MessageType = EMessageType.HeartBeat,
+                        MessageId = this.GetNextReliableId(),
+                        Data = BitConverter.GetBytes(kvp.Value.RTT),
+                        RemoteEndpoint = kvp.Key
+                    };
+                    kvp.Value.StartHeartbeat(msg.MessageId);
+                    this.Send(msg);
+                }
+            }
+            if (timeout.Count > 0)
+            {
+                foreach (KeyValuePair<IPEndPoint, GGConnection> kvp in timeout)
+                {
+                    this.ClientDisconnected?.Invoke(kvp.Value, "timeout");
+                    this.RemoveClient(kvp.Value);
+                }
+                this.Logger?.LogInfo(timeout.Count + " connections timed out.");
+            }
+
+            //Remove old pending disconnects and force disconnect
             Dictionary<GGConnection, PendingDisconnect> remove = new Dictionary<GGConnection, PendingDisconnect>();
             foreach (KeyValuePair<GGConnection, PendingDisconnect> kvp in this.PendingDisconnects)
             {
@@ -279,15 +314,16 @@ namespace GodmodeGames.Net.Transport.Udp
             if (!this.Connections.TryGetValue(msg.RemoteEndpoint, out client))
             {
                 client = new GGConnection(this, (ServerSocketSettings)this.SocketSettings, this.Logger, (IPEndPoint)msg.RemoteEndpoint);
-                this.Connections.Add(msg.RemoteEndpoint, client);
-
-                this.TickEvents.Enqueue(new TickEvent
+                if (this.Connections.TryAdd(msg.RemoteEndpoint, client))
                 {
-                    OnTick = () =>
+                    this.TickEvents.Enqueue(new TickEvent
                     {
-                        this.ClientConnected?.Invoke(client);
-                    }
-                });
+                        OnTick = () =>
+                        {
+                            this.ClientConnected?.Invoke(client);
+                        }
+                    });
+                }                
             }
 
             UdpConnection conn = client.Transport as UdpConnection;
@@ -389,6 +425,11 @@ namespace GodmodeGames.Net.Transport.Udp
                     }
                 }
             }
+            else if (msg.MessageType == EMessageType.HeartBeat)
+            {
+                //heartbeat response
+                client.HeartbeatResponseReceived(msg.MessageId);
+            }
         }
 
         /// <summary>
@@ -397,7 +438,7 @@ namespace GodmodeGames.Net.Transport.Udp
         /// <param name="connection"></param>
         private void RemoveClient(GGConnection connection)
         {
-            this.Connections.Remove(connection.ClientEndpoint);
+            this.Connections.TryRemove(connection.ClientEndpoint, out _);
 
             if (this.ListeningStatus == EListeningStatus.ShuttingDown && this.Connections.Count == 0)
             {
@@ -448,27 +489,39 @@ namespace GodmodeGames.Net.Transport.Udp
         /// <summary>
         /// update the statistic, because a packet was lost
         /// </summary>
-        protected override void UpdatePacketLost()
+        protected override void UpdatePacketLost(IPEndPoint endpoint)
         {
             this.Statistics.UpdatePacketLost();
+            if (this.Connections.TryGetValue(endpoint, out GGConnection conn))
+            {
+                conn.Statistics.UpdatePacketLost();
+            }
         }
 
         /// <summary>
         /// update the received-statistics
         /// </summary>
         /// <param name="bytes"></param>
-        protected override void UpdateStatisticsReceive(int bytes)
+        protected override void UpdateStatisticsReceive(int bytes, IPEndPoint endpoint)
         {
             this.Statistics.UpdateReceiveStatistics(bytes);
+            if (this.Connections.TryGetValue(endpoint, out GGConnection conn))
+            {
+                conn.Statistics.UpdateReceiveStatistics(bytes);
+            }
         }
 
         /// <summary>
         /// update the sent-statistics
         /// </summary>
         /// <param name="bytes"></param>
-        protected override void UpdateStatisticsSent(int bytes)
+        protected override void UpdateStatisticsSent(int bytes, IPEndPoint endpoint)
         {
             this.Statistics.UpdateSentStatistics(bytes);
+            if (this.Connections.TryGetValue(endpoint, out GGConnection conn))
+            {
+                conn.Statistics.UpdateSentStatistics(bytes);
+            }
         }
 
         /// <summary>
