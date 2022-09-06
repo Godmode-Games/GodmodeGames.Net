@@ -266,6 +266,26 @@ namespace GodmodeGames.Net.Transport.Udp
                 }
             }
 
+            if (this.SocketSettings.SimulatedPing > 0)
+            {
+                //Simulate ping, re-queue the packet until it can be send
+                if (msg.AddedSimulatedPing == false)
+                {
+                    msg.ProcessTime = DateTime.UtcNow.AddMilliseconds(this.SocketSettings.SimulatedPing);
+                    msg.AddedSimulatedPing = true;
+                    this.OutgoingMessages.Enqueue(msg);
+                    return;
+                }
+                else
+                {
+                    if (msg.ProcessTime > DateTime.UtcNow)
+                    {
+                        this.OutgoingMessages.Enqueue(msg);
+                        return;
+                    }
+                }
+            }
+
             byte[] data;
 
             try

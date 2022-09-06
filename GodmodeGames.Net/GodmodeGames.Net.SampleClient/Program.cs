@@ -35,12 +35,12 @@ namespace GodmodeGames.Net.SampleClient
             while (true)
             {
                 Client.Tick();
+                count += 50;
 #if GG_CLIENT_DISCONNECT
                 //disconnect after 5 sec...
                 if (Client.IsConnected)
                 {
-                    count++;
-                    if (count == 100)
+                    if (count == 5000)
                     {
 #if GG_SYNCHRONUS
                         if (Client.Disconnect("Goodbye!"))
@@ -54,13 +54,21 @@ namespace GodmodeGames.Net.SampleClient
                 }
 #endif
 
+                //show ping every 5 seconds
+                if (count % 5000 == 0)
+                {
+                    if (Client.IsConnected)
+                    {
+                        Console.WriteLine("My ping is " + Client.Ping + "ms");
+                    }
+                }
                 await Task.Delay(50);
             }
         }
 
         private static void OnData(byte[] data)
         {
-            Console.WriteLine("Received from server " + Client.ServerEndpoint.ToString() + ": " + Encoding.UTF8.GetString(data));
+            Console.WriteLine("Received from server " + Client.ServerEndpoint.ToString() + ": \"" + Encoding.UTF8.GetString(data) + "\"");
         }
 
         private static void OnConnect(bool success)

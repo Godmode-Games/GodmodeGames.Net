@@ -4,7 +4,7 @@ using GodmodeGames.Net.Transport;
 using GodmodeGames.Net.Transport.Statistics;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using static GodmodeGames.Net.Transport.IServerTransport;
 
@@ -24,6 +24,10 @@ namespace GodmodeGames.Net
         /// Connected clients
         /// </summary>
         public ConcurrentDictionary<IPEndPoint, GGConnection> Connections => this.Transport.Connections;
+        /// <summary>
+        /// Connected clients as array
+        /// </summary>
+        public GGConnection[] ConnectionsArray => this.Connections.Values.ToArray();
         /// <summary>
         /// Is the server running?
         /// </summary>

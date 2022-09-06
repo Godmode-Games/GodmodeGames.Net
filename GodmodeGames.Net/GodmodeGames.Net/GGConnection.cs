@@ -45,7 +45,7 @@ namespace GodmodeGames.Net
         private Stopwatch HeartbeatStopwatch = new Stopwatch();
         /// Current Ping of the client
         /// </summary>
-        public int RTT = -1;
+        public int Ping = -1;
 
         internal GGConnection(IServerTransport servertransport, ServerSocketSettings settings, ILogger logger, IPEndPoint endpoint)
         {
@@ -53,7 +53,7 @@ namespace GodmodeGames.Net
             this.Settings = settings;
             this.Logger = logger;
             this.ClientEndpoint = endpoint;
-            this.LastHeartbeat = DateTime.UtcNow;
+            this.LastHeartbeat = DateTime.UtcNow.Subtract(TimeSpan.FromMilliseconds(this.Settings.HeartbeatInterval - 1000));//first ping in 1 seconds after connect, then every HeartbeatInterval
             this.HeartbeatStopwatch = new Stopwatch();
 
             if (servertransport is UdpServerListener)
@@ -97,12 +97,17 @@ namespace GodmodeGames.Net
             if (this.LastHeartbeatId == id)
             {
                 this.HeartbeatStopwatch.Stop();
-                this.RTT = (int)this.HeartbeatStopwatch.ElapsedMilliseconds;
+                this.Ping = (int)this.HeartbeatStopwatch.ElapsedMilliseconds;
 
                 //reset
                 this.LastHeartbeatId = -1;
                 this.LastHeartbeat = DateTime.UtcNow;
             }
+        }
+
+        public override string ToString()
+        {
+            return this.ClientEndpoint.ToString();
         }
     }
 }

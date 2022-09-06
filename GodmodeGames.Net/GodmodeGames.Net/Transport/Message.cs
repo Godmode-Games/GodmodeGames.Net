@@ -5,21 +5,25 @@ using System.Net;
 
 namespace GodmodeGames.Net.Transport
 {
-    internal class Message : IEquatable<Message>
+    internal class Message
     {
-        public enum EMessageType : byte { Data = 1, Ack = 2, DiscoverRequest = 3, DiscoverResponse = 4, Disconnect = 5, HeartBeat = 6 }
-        public EMessageType MessageType = EMessageType.Data;
+        internal enum EMessageType : byte { Data = 1, Ack = 2, DiscoverRequest = 3, DiscoverResponse = 4, Disconnect = 5, HeartBeat = 6 }
+        internal EMessageType MessageType = EMessageType.Data;
 
-        public byte[] Data = new byte[0];
-        public int MessageId = -1;// -1 means notreliable
-        public IPEndPoint RemoteEndpoint;
+        internal byte[] Data = new byte[0];
+        internal int MessageId = -1;// -1 means notreliable
+        internal IPEndPoint RemoteEndpoint;
 
-        public Message()
+        //Ping Simulation...
+        internal DateTime ProcessTime = DateTime.UtcNow;
+        internal bool AddedSimulatedPing = false;
+
+        internal Message()
         {
 
         }
 
-        public Message(byte[] data, int messageid, IPEndPoint endpoint, EMessageType type)
+        internal Message(byte[] data, int messageid, IPEndPoint endpoint, EMessageType type)
         {
             Data = data;
             MessageId = messageid;
@@ -33,7 +37,7 @@ namespace GodmodeGames.Net.Transport
         /// <param name="data"></param>
         /// <param name="endpoint"></param>
         /// <returns></returns>
-        public bool Deserialize(byte[] data, IPEndPoint endpoint)
+        internal bool Deserialize(byte[] data, IPEndPoint endpoint)
         {
             if (data.Length < 5)
             {
@@ -60,7 +64,7 @@ namespace GodmodeGames.Net.Transport
         /// returns the byte-array of the message
         /// </summary>
         /// <returns></returns>
-        public byte[] Serialize()
+        internal byte[] Serialize()
         {
             List<byte> ret = new List<byte>();
             ret.Add((byte)MessageType);
@@ -71,11 +75,6 @@ namespace GodmodeGames.Net.Transport
             }
 
             return ret.ToArray();
-        }
-
-        public bool Equals(Message other)
-        {
-            return this.MessageType == other.MessageType && this.MessageId == other.MessageId && this.RemoteEndpoint == other.RemoteEndpoint && this.Data == other.Data;
         }
     }
 }

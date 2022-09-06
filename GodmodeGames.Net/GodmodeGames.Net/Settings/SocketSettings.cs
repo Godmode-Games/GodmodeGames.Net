@@ -29,6 +29,10 @@
         /// </summary>
         public int SimulatedPacketLostReceive = 0;
         /// <summary>
+        /// Simulate ping on sending packets (in milliseconds)
+        /// </summary>
+        public int SimulatedPing = 0;
+        /// <summary>
         /// Tcp or Udp as transport layer
         /// </summary>
         public enum ETransport : byte { Udp, Tcp }

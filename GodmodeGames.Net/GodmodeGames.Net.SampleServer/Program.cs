@@ -21,15 +21,15 @@ namespace GodmodeGames.Net.SampleServer
             Server.ShutdownCompleted += OnShutdown;
             Server.StartListening(new IPEndPoint(IPAddress.Any, 7000));
 
-            int count = 0;
+            long count = 0;
             while (true)
             {
                 Server.Tick();
+                count += 50;
 #if GG_SERVER_DISCONNECT
                 if (Server.Connections.Count > 0)
-                {
-                    count++;
-                    if (count == 100)
+                {   
+                    if (count == 5000)
                     {
                         Server.DisconnectClient(Server.Connections.First().Value, "Off he goes...");
                     }
@@ -37,13 +37,23 @@ namespace GodmodeGames.Net.SampleServer
 #elif GG_SERVER_SHUTDOWN
 	            if (Server.IsListening == true)
                 {
-                    count++;
-                    if (count == 100)
+                    if (count == 5000)
                     {
                         Server.ShutdownAsync();
                     }
                 }
 #endif
+                //show ping every 5 seconds
+                if (count % 5000 == 0)
+                {
+                    if (Server.IsListening && Server.Connections.Count > 0)
+                    {
+                        foreach (var connection in Server.ConnectionsArray)
+                        {
+                            Console.WriteLine(connection.ToString() + " has a ping of " + connection.Ping + "ms");
+                        }
+                    }
+                }
                 await Task.Delay(50);
             }
         }
@@ -65,7 +75,7 @@ namespace GodmodeGames.Net.SampleServer
 
         private static void OnData(byte[] data, GGConnection connection)
         {
-            Console.WriteLine("Received from client " + connection.ClientEndpoint.ToString() + ": " + Encoding.UTF8.GetString(data));
+            Console.WriteLine("Received from client " + connection.ClientEndpoint.ToString() + ": \"" + Encoding.UTF8.GetString(data) + "\"");
             connection.Send(Encoding.UTF8.GetBytes("Welcome Client!"));
         }
     }

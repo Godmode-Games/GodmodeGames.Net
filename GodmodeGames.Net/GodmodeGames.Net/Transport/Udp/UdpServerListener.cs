@@ -94,6 +94,11 @@ namespace GodmodeGames.Net.Transport.Udp
         /// </summary>
         public void Tick()
         {
+            if (this.ListeningStatus == EListeningStatus.NotListening || this.ListeningStatus == EListeningStatus.Shutdown)
+            {
+                return;
+            }
+
             this.DispatchMessages();
 
             //invoke Tick events
@@ -118,7 +123,7 @@ namespace GodmodeGames.Net.Transport.Udp
                     {
                         MessageType = EMessageType.HeartBeat,
                         MessageId = this.GetNextReliableId(),
-                        Data = BitConverter.GetBytes(kvp.Value.RTT),
+                        Data = BitConverter.GetBytes(kvp.Value.Ping),
                         RemoteEndpoint = kvp.Key
                     };
                     kvp.Value.StartHeartbeat(msg.MessageId);
