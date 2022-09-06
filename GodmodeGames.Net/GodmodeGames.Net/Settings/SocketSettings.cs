@@ -5,10 +5,6 @@
     public abstract class SocketSettings
     {
         /// <summary>
-        /// How long to wait for discover-response on connecting, in milliseconds
-        /// </summary>
-        public ushort ConnectingTimeout = 2000;
-        /// <summary>
         /// Connection timeout after milliseconds
         /// </summary>
         public ushort TimeoutTime = 20000;
@@ -25,9 +21,13 @@
         /// </summary>
         public int SendBufferSize = 1024 * 1024;
         /// <summary>
-        /// Default send-mode (udp only) - reliable or unreliable
+        /// Simulate packet lost while sending packets (in percent 0 - 100)
         /// </summary>
-        public EUdpSendMode UdpDefaultSendMode = EUdpSendMode.Reliable;
+        public int SimulatedPacketLostSend = 0;
+        /// <summary>
+        /// Simulate packet lost while receiving packets (in percent 0 - 100)
+        /// </summary>
+        public int SimulatedPacketLostReceive = 0;
         /// <summary>
         /// Tcp or Udp as transport layer
         /// </summary>
@@ -36,6 +36,10 @@
         /// what transport layer is used
         /// </summary>
         public ETransport Transport = ETransport.Udp;
+        /// <summary>
+        /// Default send-mode (udp only) - reliable or unreliable
+        /// </summary>
+        public EUdpSendMode UdpDefaultSendMode = EUdpSendMode.Reliable;
         /// <summary>
         /// when to resend a message, if no ack has arrived
         /// </summary>

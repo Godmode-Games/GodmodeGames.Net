@@ -318,7 +318,6 @@ namespace GodmodeGames.Net.Transport.Udp
                     ping = BitConverter.ToInt32(msg.Data);
                 }
                 this.RTT = ping;
-                this.Logger?.LogInfo("My ping is " + ping);
             }
         }
 

@@ -99,8 +99,7 @@ namespace GodmodeGames.Net
                 this.HeartbeatStopwatch.Stop();
                 this.RTT = (int)this.HeartbeatStopwatch.ElapsedMilliseconds;
 
-                this.Logger?.LogInfo("RTT for " + this.ClientEndpoint + ": " + this.RTT);
-
+                //reset
                 this.LastHeartbeatId = -1;
                 this.LastHeartbeat = DateTime.UtcNow;
             }

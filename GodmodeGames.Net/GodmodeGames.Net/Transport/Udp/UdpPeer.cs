@@ -121,6 +121,18 @@ namespace GodmodeGames.Net.Transport.Udp
                         {
                             this.UpdateStatisticsReceive(numOfReceivedBytes, (IPEndPoint)endPoint);
 
+                            if (this.SocketSettings.SimulatedPacketLostReceive > 0)
+                            {
+                                //simulate packet lost
+                                int percent = new Random().Next(0, 101);
+                                int packetlost = Math.Clamp(this.SocketSettings.SimulatedPacketLostReceive, 0, 100);
+                                if (percent < packetlost)
+                                {
+                                    this.Logger?.LogWarning("Simulate receive Packetlost...");
+                                    continue;
+                                }
+                            }
+
                             Message msg = new Message();
                             if (msg.Deserialize(data.Take(numOfReceivedBytes).ToArray(), (IPEndPoint)endPoint))
                             {
@@ -211,22 +223,9 @@ namespace GodmodeGames.Net.Transport.Udp
                                     }
                                     else
                                     {
-                                        int numOfSentBytes;
-                                        byte[] data = kvp.Value.Serialize();
-                                        try
-                                        {
-                                            numOfSentBytes = this.Socket.SendTo(data, 0, data.Length, SocketFlags.None, kvp.Value.RemoteEndpoint);
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            this.Logger?.LogError("Error while re-sending data to " + kvp.Value.RemoteEndpoint.ToString() + ": " + ex.Message);
-                                            continue;
-                                        }
-
+                                        this.InternalSendTo(kvp.Value);
                                         kvp.Value.RetryTimes++;
                                         kvp.Value.LastTryTime = DateTime.UtcNow;
-
-                                        this.UpdateStatisticsSent(numOfSentBytes, kvp.Value.RemoteEndpoint);
                                     }
                                 }
                             }
@@ -248,7 +247,27 @@ namespace GodmodeGames.Net.Transport.Udp
 
         protected void InternalSendTo(Message msg)
         {
+            if (this.SocketSettings.SimulatedPacketLostSend > 0)
+            {
+                //simulate packet lost
+                int percent = new Random().Next(0, 101);
+                int packetlost = Math.Clamp(this.SocketSettings.SimulatedPacketLostSend, 0, 100);
+                if (percent < packetlost)
+                {
+                    this.Logger?.LogWarning("Simulate send packet-lost...");
+
+                    if (msg.MessageType != EMessageType.Ack && msg.MessageId >= 0)
+                    {
+                        AckMessage ack = new AckMessage(msg);
+                        this.PendingUnacknowledgedMessages.TryAdd(msg.MessageId, ack);
+                    }
+
+                    return;
+                }
+            }
+
             byte[] data;
+
             try
             {
                 data = msg.Serialize();
