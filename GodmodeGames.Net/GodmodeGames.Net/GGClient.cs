@@ -8,7 +8,7 @@ using static GodmodeGames.Net.Transport.IClientTransport;
 
 namespace GodmodeGames.Net
 {
-    public class GGClient : GGSocket
+    public class GGClient : GGPeer
     {
         #region Events
         public delegate void OnConnectAttemptHandler(bool success);
@@ -58,8 +58,7 @@ namespace GodmodeGames.Net
 
             if (this.Settings.Transport == SocketSettings.ETransport.Tcp)
             {
-                //this.Transport = new Transport.Tcp.TcpClient();
-                throw new NotImplementedException("TODO TCP");
+                this.Transport = new Transport.Tcp.TcpClient();
             }
             else
             {

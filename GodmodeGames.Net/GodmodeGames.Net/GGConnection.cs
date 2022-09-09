@@ -2,6 +2,7 @@
 using GodmodeGames.Net.Settings;
 using GodmodeGames.Net.Transport;
 using GodmodeGames.Net.Transport.Statistics;
+using GodmodeGames.Net.Transport.Tcp;
 using GodmodeGames.Net.Transport.Udp;
 using System;
 using System.Diagnostics;
@@ -9,7 +10,7 @@ using System.Net;
 
 namespace GodmodeGames.Net
 {
-    public class GGConnection : GGSocket
+    public class GGConnection : GGPeer
     {
         /// <summary>
         /// Transport layer of the server, the connection is part of
@@ -62,7 +63,7 @@ namespace GodmodeGames.Net
             }
             else
             {
-                throw new NotImplementedException("TODO TCP");
+                this.Transport = new TcpConnection(this);
             }
         }
 

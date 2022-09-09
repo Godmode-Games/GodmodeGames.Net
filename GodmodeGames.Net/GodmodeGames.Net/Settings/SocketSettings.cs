@@ -32,6 +32,8 @@
         /// Simulate ping on sending packets (in milliseconds)
         /// </summary>
         public int SimulatedPing = 0;
+
+
         /// <summary>
         /// Tcp or Udp as transport layer
         /// </summary>
@@ -56,5 +58,11 @@
         /// Buffer the last messages, to avoid dublicate receive
         /// </summary>
         public ushort UdpDublicateMessagesBuffer = 100;
+
+
+        /// <summary>
+        /// Use ssl for Tcp Connection
+        /// </summary>
+        public bool TcpSSL = false;
     }
 }

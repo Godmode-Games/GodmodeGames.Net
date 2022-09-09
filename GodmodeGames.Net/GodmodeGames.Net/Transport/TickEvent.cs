@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace GodmodeGames.Net.Transport.Udp
+namespace GodmodeGames.Net.Transport
 {
     internal class TickEvent
     {

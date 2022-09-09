@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 
-namespace GodmodeGames.Net.Transport
+namespace GodmodeGames.Net.Transport.Udp
 {
-    internal class Message
+    internal class UdpMessage
     {
         internal enum EMessageType : byte { Data = 1, Ack = 2, DiscoverRequest = 3, DiscoverResponse = 4, Disconnect = 5, HeartBeat = 6 }
         internal EMessageType MessageType = EMessageType.Data;
@@ -18,12 +18,12 @@ namespace GodmodeGames.Net.Transport
         internal DateTime ProcessTime = DateTime.UtcNow;
         internal bool AddedSimulatedPing = false;
 
-        internal Message()
+        internal UdpMessage()
         {
 
         }
 
-        internal Message(byte[] data, int messageid, IPEndPoint endpoint, EMessageType type)
+        internal UdpMessage(byte[] data, int messageid, IPEndPoint endpoint, EMessageType type)
         {
             Data = data;
             MessageId = messageid;
@@ -44,17 +44,17 @@ namespace GodmodeGames.Net.Transport
                 return false;
             }
 
-            MessageType = (EMessageType)data[0];
-            MessageId = BitConverter.ToInt32(data, 1);
-            RemoteEndpoint = endpoint;
+            this.MessageType = (EMessageType)data[0];
+            this.MessageId = BitConverter.ToInt32(data, 1);
+            this.RemoteEndpoint = endpoint;
 
             if (data.Length > 5)
             {
-                Data = data.Skip(5).ToArray();
+                this.Data = data.Skip(5).ToArray();
             }
             else
             {
-                Data = new byte[0];
+                this.Data = new byte[0];
             }
 
             return true;
@@ -67,11 +67,11 @@ namespace GodmodeGames.Net.Transport
         internal byte[] Serialize()
         {
             List<byte> ret = new List<byte>();
-            ret.Add((byte)MessageType);
-            ret.AddRange(BitConverter.GetBytes(MessageId));
-            if (Data.Length > 0)
+            ret.Add((byte)this.MessageType);
+            ret.AddRange(BitConverter.GetBytes(this.MessageId));
+            if (this.Data.Length > 0)
             {
-                ret.AddRange(Data);
+                ret.AddRange(this.Data);
             }
 
             return ret.ToArray();

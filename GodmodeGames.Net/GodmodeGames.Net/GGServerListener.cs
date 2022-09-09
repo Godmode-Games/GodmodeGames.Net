@@ -10,7 +10,7 @@ using static GodmodeGames.Net.Transport.IServerTransport;
 
 namespace GodmodeGames.Net
 {
-    public class GGServerListener : GGSocket
+    public class GGServerListener : GGPeer
     {
         /// <summary>
         /// Server-Settings
@@ -60,7 +60,7 @@ namespace GodmodeGames.Net
 
             if (this.Settings.Transport == SocketSettings.ETransport.Tcp)
             {
-                throw new NotImplementedException("TCP TODO");
+                this.Transport = new Transport.Tcp.TcpServerListener();
             }
             else
             {

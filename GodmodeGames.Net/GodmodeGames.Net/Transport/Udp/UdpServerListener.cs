@@ -1,14 +1,16 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Data.SqlTypes;
 using System.Net;
 using System.Text;
 using System.Threading;
 using GodmodeGames.Net.Logging;
 using GodmodeGames.Net.Settings;
 using GodmodeGames.Net.Transport.Statistics;
+using GodmodeGames.Net.Utilities;
 using static GodmodeGames.Net.Transport.IServerTransport;
-using static GodmodeGames.Net.Transport.Message;
+using static GodmodeGames.Net.Transport.Udp.UdpMessage;
 
 namespace GodmodeGames.Net.Transport.Udp
 {
@@ -83,9 +85,12 @@ namespace GodmodeGames.Net.Transport.Udp
         public void ShutdownAsync(string reason = "Shutdown")
         {
             this.ListeningStatus = EListeningStatus.ShuttingDown;
-            foreach (KeyValuePair<IPEndPoint, GGConnection> kvp in this.Connections)
+            if (this.Connections.Count > 0)
             {
-                this.DisconnectClient(kvp.Value, reason);
+                foreach (KeyValuePair<IPEndPoint, GGConnection> kvp in this.Connections)
+                {
+                    this.DisconnectClient(kvp.Value, reason);
+                }
             }
         }
 
@@ -119,7 +124,7 @@ namespace GodmodeGames.Net.Transport.Udp
 
                 if (kvp.Value.LastHeartbeat.AddMilliseconds(heartbeat) < DateTime.UtcNow)
                 {
-                    Message msg = new Message
+                    UdpMessage msg = new UdpMessage
                     {
                         MessageType = EMessageType.HeartBeat,
                         MessageId = this.GetNextReliableId(),
@@ -192,7 +197,7 @@ namespace GodmodeGames.Net.Transport.Udp
                     msgid = this.GetNextReliableId();
                 }
 
-                Message message = new Message(data, msgid, connection.ClientEndpoint, EMessageType.Data);
+                UdpMessage message = new UdpMessage(data, msgid, connection.ClientEndpoint, EMessageType.Data);
                 this.OutgoingMessages.Enqueue(message);
             }
         }
@@ -236,7 +241,7 @@ namespace GodmodeGames.Net.Transport.Udp
                         data = Encoding.UTF8.GetBytes(reason);
                     }
 
-                    Message disc = new Message
+                    UdpMessage disc = new UdpMessage
                     {
                         MessageType = EMessageType.Disconnect,
                         MessageId = this.GetNextReliableId(),
@@ -279,7 +284,7 @@ namespace GodmodeGames.Net.Transport.Udp
         {
             if (!this.IncommingMessages.IsEmpty)
             {
-                while (this.IncommingMessages.TryDequeue(out Message msg))
+                while (this.IncommingMessages.TryDequeue(out UdpMessage msg))
                 {
                     GGConnection client;
                     if (!this.Connections.TryGetValue(msg.RemoteEndpoint, out client))
@@ -312,7 +317,7 @@ namespace GodmodeGames.Net.Transport.Udp
         /// Called by receiver-task, asynchronous, dispatch internal messages
         /// </summary>
         /// <param name="msg"></param>
-        protected override void ReceivedInternalMessage(Message msg)
+        protected override void ReceivedInternalMessage(UdpMessage msg)
         {
             //called async in receive-task!
             GGConnection client = null;
@@ -328,7 +333,7 @@ namespace GodmodeGames.Net.Transport.Udp
                             this.ClientConnected?.Invoke(client);
                         }
                     });
-                }                
+                }
             }
 
             UdpConnection conn = client.Transport as UdpConnection;
@@ -348,25 +353,13 @@ namespace GodmodeGames.Net.Transport.Udp
             //internal message
             if (msg.MessageType == EMessageType.DiscoverRequest && this.ListeningStatus > EListeningStatus.NotListening && this.ListeningStatus < EListeningStatus.ShuttingDown)
             {
-                Message ret = new Message { MessageType = EMessageType.DiscoverResponse, MessageId = this.GetNextReliableId(), RemoteEndpoint = msg.RemoteEndpoint };
+                UdpMessage ret = new UdpMessage { MessageType = EMessageType.DiscoverResponse, MessageId = this.GetNextReliableId(), RemoteEndpoint = msg.RemoteEndpoint };
                 this.OutgoingMessages.Enqueue(ret);
             }
             else if (msg.MessageType == EMessageType.Disconnect)
             {
                 //Client wants to disconnect
-                string reason = null;
-                if (msg.Data.Length > 0)
-                {
-                    try
-                    {
-                        reason = Encoding.UTF8.GetString(msg.Data);
-                    }
-                    catch
-                    {
-
-                    }
-                }
-
+                string reason = Helper.BytesToString(msg.Data);
                 this.TickEvents.Enqueue(new TickEvent
                 {
                     OnTick = () =>
@@ -398,19 +391,7 @@ namespace GodmodeGames.Net.Transport.Udp
                 //client received the disconnect message from server
                 if (this.PendingDisconnects.ContainsKey(client))
                 {
-                    string reason = null;
-                    if (msg.Data.Length > 5)
-                    {
-                        try
-                        {
-                            reason = Encoding.UTF8.GetString(msg.Data);
-                        }
-                        catch
-                        {
-
-                        }
-                    }
-
+                    string reason = Helper.BytesToString(msg.Data);
                     this.PendingDisconnects.Remove(client, out _);
                     if (this.ListeningStatus != EListeningStatus.ShuttingDown)
                     {
@@ -464,19 +445,7 @@ namespace GodmodeGames.Net.Transport.Udp
                 {
                     if (this.PendingDisconnects.ContainsKey(conn))
                     {
-                        string reason = null;
-                        if (message.Data.Length > 0)
-                        {
-                            try
-                            {
-                                reason = Encoding.UTF8.GetString(message.Data);
-                            }
-                            catch
-                            {
-
-                            }
-                        }
-
+                        string reason = Helper.BytesToString(message.Data);
                         this.PendingDisconnects.Remove(conn, out _);
                         this.TickEvents.Enqueue(new TickEvent
                         {

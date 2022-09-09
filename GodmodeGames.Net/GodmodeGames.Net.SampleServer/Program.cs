@@ -1,5 +1,5 @@
 ﻿//#define GG_SERVER_DISCONNECT //should the server disconnect clients after 5 seconds?
-//#define GG_SERVER_SHUTDOWN //shut down server after 5 seconds?
+#define GG_SERVER_SHUTDOWN //shut down server after 5 seconds?
 
 using GodmodeGames.Net.Logging;
 using GodmodeGames.Net.Settings;
@@ -13,7 +13,7 @@ namespace GodmodeGames.Net.SampleServer
         static GGServerListener Server = null;
         static async Task Main(string[] args)
         {
-            Server = new GGServerListener(new ServerSocketSettings(), new ConsoleLogger());
+            Server = new GGServerListener(new ServerSocketSettings { Transport = SocketSettings.ETransport.Tcp }, new ConsoleLogger());
 
             Server.ReceivedData += OnData;
             Server.ClientConnected += OnClientConnect;

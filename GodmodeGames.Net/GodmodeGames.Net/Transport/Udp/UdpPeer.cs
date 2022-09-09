@@ -1,7 +1,7 @@
 ﻿using System.Net.Sockets;
 using System.Threading.Tasks;
 using System.Threading;
-using static GodmodeGames.Net.Transport.Message;
+using static GodmodeGames.Net.Transport.Udp.UdpMessage;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -27,11 +27,11 @@ namespace GodmodeGames.Net.Transport.Udp
         /// <summary>
         /// Incomming messages from server 
         /// </summary>
-        protected ConcurrentQueue<Message> IncommingMessages = new ConcurrentQueue<Message>();
+        protected ConcurrentQueue<UdpMessage> IncommingMessages = new ConcurrentQueue<UdpMessage>();
         /// <summary>
         /// Outgoing messages to server
         /// </summary>
-        protected ConcurrentQueue<Message> OutgoingMessages = new ConcurrentQueue<Message>();
+        protected ConcurrentQueue<UdpMessage> OutgoingMessages = new ConcurrentQueue<UdpMessage>();
         /// <summary>
         /// Outgoing messages waiting for acknowledgment
         /// </summary>
@@ -64,7 +64,7 @@ namespace GodmodeGames.Net.Transport.Udp
         /// add a message to the outgoing queue
         /// </summary>
         /// <param name="msg"></param>
-        protected virtual void Send(Message msg)
+        protected virtual void Send(UdpMessage msg)
         {
             this.StartSendingTask();
             this.OutgoingMessages.Enqueue(msg);
@@ -75,7 +75,7 @@ namespace GodmodeGames.Net.Transport.Udp
         protected abstract void UpdatePacketLost(IPEndPoint endpoint);
         protected abstract void PacketLost(AckMessage message);
         protected abstract void ConnectionFailed(IPEndPoint endpoint);
-        protected abstract void ReceivedInternalMessage(Message msg);
+        protected abstract void ReceivedInternalMessage(UdpMessage msg);
         protected abstract void ReceivedInternalACK(AckMessage msg);
 
         /// <summary>
@@ -133,7 +133,7 @@ namespace GodmodeGames.Net.Transport.Udp
                                 }
                             }
 
-                            Message msg = new Message();
+                            UdpMessage msg = new UdpMessage();
                             if (msg.Deserialize(data.Take(numOfReceivedBytes).ToArray(), (IPEndPoint)endPoint))
                             {
                                 if (msg.MessageType == EMessageType.Ack)
@@ -148,7 +148,7 @@ namespace GodmodeGames.Net.Transport.Udp
                                     if (msg.MessageId >= 0)
                                     {
                                         //send ack for reliable message back...
-                                        Message ack = new Message
+                                        UdpMessage ack = new UdpMessage
                                         {
                                             MessageType = EMessageType.Ack,
                                             MessageId = msg.MessageId,
@@ -200,7 +200,7 @@ namespace GodmodeGames.Net.Transport.Udp
                         //Send Messages...
                         if (this.Socket != null && !this.OutgoingMessages.IsEmpty)
                         {
-                            while (this.OutgoingMessages.TryDequeue(out Message msg))
+                            while (this.OutgoingMessages.TryDequeue(out UdpMessage msg))
                             {
                                 this.InternalSendTo(msg);
                             }
@@ -245,7 +245,7 @@ namespace GodmodeGames.Net.Transport.Udp
             }
         }
 
-        protected void InternalSendTo(Message msg)
+        protected void InternalSendTo(UdpMessage msg)
         {
             if (this.SocketSettings.SimulatedPacketLostSend > 0)
             {

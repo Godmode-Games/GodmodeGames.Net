@@ -2,7 +2,7 @@
 
 namespace GodmodeGames.Net.Transport.Udp
 {
-    internal class AckMessage : Message
+    internal class AckMessage : UdpMessage
     {
         /// <summary>
         /// when was the last send attempt
@@ -18,7 +18,7 @@ namespace GodmodeGames.Net.Transport.Udp
 
         }
 
-        public AckMessage(Message msg) : base(msg.Data, msg.MessageId, msg.RemoteEndpoint, msg.MessageType)
+        public AckMessage(UdpMessage msg) : base(msg.Data, msg.MessageId, msg.RemoteEndpoint, msg.MessageType)
         {
             this.LastTryTime = DateTime.UtcNow;
             this.RetryTimes = 0;
