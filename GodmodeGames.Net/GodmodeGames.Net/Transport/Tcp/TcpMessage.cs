@@ -39,7 +39,7 @@ namespace GodmodeGames.Net.Transport.Tcp
             this.MessageType = (EMessageType)data[0];
             this.Client = client;
 
-            if (data.Length > 4)
+            if (data.Length > 1)
             {
                 this.Data = data.Skip(1).ToArray();
             }

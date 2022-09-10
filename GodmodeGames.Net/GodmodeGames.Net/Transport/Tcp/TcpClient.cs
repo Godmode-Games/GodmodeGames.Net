@@ -16,6 +16,8 @@ using System.Text;
 using static GodmodeGames.Net.Transport.Tcp.TcpMessage;
 using System.IO;
 using GodmodeGames.Net.Utilities;
+using static GodmodeGames.Net.GGClient;
+using System.Diagnostics;
 
 namespace GodmodeGames.Net.Transport.Tcp
 {
@@ -45,6 +47,21 @@ namespace GodmodeGames.Net.Transport.Tcp
         private ConcurrentQueue<TcpMessage> IncommingMessages = new ConcurrentQueue<TcpMessage>();
         private ConcurrentQueue<TickEvent> TickEvents = new ConcurrentQueue<TickEvent>();//Event that should be invoked in Tick-method
         private Task SendTask = null;
+
+        private int NextPingId = 1;
+
+        /// <summary>
+        /// When was the last heartbeat sent?
+        /// </summary>
+        internal DateTime LastHeartbeat = DateTime.UtcNow;
+        /// <summary>
+        /// Internal message of the last heartbeat-message
+        /// </summary>
+        internal int LastHeartbeatId = -1;
+        /// <summary>
+        /// stopwatch to calcualte rtt
+        /// </summary>
+        private Stopwatch HeartbeatStopwatch = new Stopwatch();
 
         public void Inititalize(ClientSocketSettings settings, ILogger logger)
         {
@@ -196,6 +213,29 @@ namespace GodmodeGames.Net.Transport.Tcp
             while (this.TickEvents.TryDequeue(out TickEvent tick))
             {
                 tick.OnTick?.Invoke();
+            }
+
+            if (this.LastHeartbeat.AddMilliseconds(this.SocketSettings.HeartbeatInterval) < DateTime.UtcNow)
+            {
+                int pingid = this.GetNextPingId();
+                TcpMessage msg = new TcpMessage
+                {
+                    MessageType = EMessageType.HeartBeatPing,
+                    Data = BitConverter.GetBytes(pingid),
+                    Client = null
+                };
+                this.LastHeartbeatId = pingid;
+                this.LastHeartbeat = DateTime.UtcNow;
+                this.HeartbeatStopwatch.Restart();
+
+                this.OutgoingMessages.Enqueue(msg);
+            }
+
+            //check timeout
+            if (DateTime.UtcNow.Subtract(this.Statistics.LastDataReceived).TotalSeconds > this.SocketSettings.TimeoutTime)
+            {
+                this.StopReceive();
+                this.Disconnected?.Invoke(EDisconnectBy.ConnectionLost, "timeout");
             }
         }
 
@@ -386,11 +426,11 @@ namespace GodmodeGames.Net.Transport.Tcp
 
                 if (this.SocketSettings.TcpSSL == false)
                 {
-                    this.myStream.BeginRead(this.asyncBuff, 0, 8192, new AsyncCallback(this.OnReceive), null);
+                    this.myStream.BeginRead(this.asyncBuff, 0, this.SocketSettings.ReceiveBufferSize, new AsyncCallback(this.OnReceive), null);
                 }
                 else
                 {
-                    this.mySSLStream.BeginRead(this.asyncBuff, 0, 8192, new AsyncCallback(this.OnReceive), null);
+                    this.mySSLStream.BeginRead(this.asyncBuff, 0, this.SocketSettings.ReceiveBufferSize, new AsyncCallback(this.OnReceive), null);
                 }
 
                 //ggf. Send-Task neu Starten
@@ -413,7 +453,7 @@ namespace GodmodeGames.Net.Transport.Tcp
                 {
                     OnTick = () =>
                     {
-                        this.Disconnected?.Invoke(GGClient.EDisconnectBy.Server, "closed connection");
+                        this.Disconnected?.Invoke(GGClient.EDisconnectBy.Server, "connection closed");
                     }
                 });
                 this.StopReceive();
@@ -486,6 +526,7 @@ namespace GodmodeGames.Net.Transport.Tcp
         {
             if (msg.MessageType == EMessageType.Disconnect)
             {
+                //Server sends disconnect reason
                 string reason = Helper.BytesToString(msg.Data);
                 this.TickEvents.Enqueue(new TickEvent()
                 {
@@ -498,19 +539,50 @@ namespace GodmodeGames.Net.Transport.Tcp
             }
             else if (msg.MessageType == EMessageType.HeartBeatPing)
             {
+                //server requesting heartbeat
                 if (msg.Data.Length >= 4)
                 {
-                    //first 4 bytes are the last ping
-                    this.RTT = BitConverter.ToInt32(msg.Data, 3);
+                    TcpMessage pong = new TcpMessage
+                    {
+                        Data = msg.Data,
+                        Client = null,
+                        MessageType = EMessageType.HeartbeatPong
+                    };
+                    this.InternalSendTo(pong);
                 }
-                TcpMessage pong = new TcpMessage
-                {
-                    Data = msg.Data,
-                    Client = null,
-                    MessageType = EMessageType.HeartbeatPong
-                };
-                this.InternalSendTo(pong);
             }
+            else if (msg.MessageType == EMessageType.HeartbeatPong)
+            {
+                //received heartbeat response from server
+                if (msg.Data.Length >= 4)
+                {
+                    int id = BitConverter.ToInt32(msg.Data);
+                    if (this.LastHeartbeatId == id)
+                    {
+                        this.HeartbeatStopwatch.Stop();
+                        this.RTT = (int)this.HeartbeatStopwatch.ElapsedMilliseconds;
+
+                        //reset
+                        this.LastHeartbeatId = -1;
+                        this.LastHeartbeat = DateTime.UtcNow;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// get the next reliable id
+        /// </summary>
+        /// <returns></returns>
+        private int GetNextPingId()
+        {
+            int id = this.NextPingId++;
+            if (this.NextPingId > int.MaxValue)
+            {
+                this.NextPingId = 1;
+            }
+
+            return id;
         }
 
         #region SSL-Validation

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Data.SqlTypes;
 using System.Net;
 using System.Text;
 using System.Threading;
@@ -113,7 +112,7 @@ namespace GodmodeGames.Net.Transport.Udp
             }
 
             List<KeyValuePair<IPEndPoint, GGConnection>> timeout = new List<KeyValuePair<IPEndPoint, GGConnection>>();
-            int heartbeat = ((ServerSocketSettings)this.SocketSettings).HeartbeatInterval;
+            int heartbeat = this.SocketSettings.HeartbeatInterval;
             //disconnect timed out connections and send heartbeat
             foreach (KeyValuePair<IPEndPoint, GGConnection> kvp in this.Connections)
             {
@@ -128,7 +127,7 @@ namespace GodmodeGames.Net.Transport.Udp
                     {
                         MessageType = EMessageType.HeartBeat,
                         MessageId = this.GetNextReliableId(),
-                        Data = BitConverter.GetBytes(kvp.Value.Ping),
+                        Data = new byte[0],
                         RemoteEndpoint = kvp.Key
                     };
                     kvp.Value.StartHeartbeat(msg.MessageId);

@@ -1,6 +1,7 @@
 ﻿using GodmodeGames.Net.Logging;
 using GodmodeGames.Net.Settings;
 using GodmodeGames.Net.Transport.Statistics;
+using GodmodeGames.Net.Transport.Udp;
 using GodmodeGames.Net.Utilities;
 using System;
 using System.Collections.Concurrent;
@@ -12,6 +13,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using static GodmodeGames.Net.Transport.IServerTransport;
+using static GodmodeGames.Net.Transport.Tcp.TcpMessage;
 
 namespace GodmodeGames.Net.Transport.Tcp
 {
@@ -40,6 +42,8 @@ namespace GodmodeGames.Net.Transport.Tcp
         private ConcurrentQueue<TcpMessage> OutgoingMessages = new ConcurrentQueue<TcpMessage>();
         private Task SendTask = null;
         private CancellationTokenSource CTS = null;
+
+        private int NextPingId = 1;
 
         public void Inititalize(ServerSocketSettings settings, ILogger logger)
         {
@@ -141,6 +145,38 @@ namespace GodmodeGames.Net.Transport.Tcp
             while (this.TickEvents.TryDequeue(out TickEvent tick))
             {
                 tick.OnTick?.Invoke();
+            }
+
+            List<KeyValuePair<IPEndPoint, GGConnection>> timeout = new List<KeyValuePair<IPEndPoint, GGConnection>>();
+            int heartbeat = this.SocketSettings.HeartbeatInterval;
+            //disconnect timed out connections and send heartbeat
+            foreach (KeyValuePair<IPEndPoint, GGConnection> kvp in this.Connections)
+            {
+                if (kvp.Value.Statistics.LastDataReceived.AddMilliseconds(this.SocketSettings.TimeoutTime) < DateTime.UtcNow)
+                {
+                    timeout.Add(kvp);
+                }
+
+                if (kvp.Value.LastHeartbeat.AddMilliseconds(heartbeat) < DateTime.UtcNow)
+                {
+                    int pingid = this.GetNextPingId();
+                    TcpMessage msg = new TcpMessage
+                    {
+                        MessageType = EMessageType.HeartBeatPing,
+                        Data = BitConverter.GetBytes(pingid),
+                        Client = kvp.Value
+                    };
+                    kvp.Value.StartHeartbeat(pingid);
+                    this.OutgoingMessages.Enqueue(msg);
+                }
+            }
+            if (timeout.Count > 0)
+            {
+                foreach (KeyValuePair<IPEndPoint, GGConnection> kvp in timeout)
+                {
+                    this.RemoveClient(kvp.Value, "timeout");
+                }
+                this.Logger?.LogInfo(timeout.Count + " connections timed out.");
             }
         }
 
@@ -244,8 +280,31 @@ namespace GodmodeGames.Net.Transport.Tcp
         {
             if (msg.MessageType == TcpMessage.EMessageType.Disconnect)
             {
+                //client sends reason for his disconnect
                 string reason = Helper.BytesToString(msg.Data);
                 this.RemoveClient(client, reason);
+            }
+            else if (msg.MessageType == EMessageType.HeartBeatPing)
+            {
+                //client send heartbeat 
+                if (msg.Data.Length >= 4)
+                {
+                    TcpMessage pong = new TcpMessage
+                    {
+                        Data = msg.Data,
+                        Client = client,
+                        MessageType = EMessageType.HeartbeatPong
+                    };
+                    this.OutgoingMessages.Enqueue(pong);
+                }
+            }
+            else if (msg.MessageType == EMessageType.HeartbeatPong)
+            {
+                //got the heartbeat response from client
+                if (msg.Data.Length >= 4)
+                {
+                    client.HeartbeatResponseReceived(BitConverter.ToInt32(msg.Data));
+                }
             }
         }
 
@@ -282,6 +341,21 @@ namespace GodmodeGames.Net.Transport.Tcp
             {
 
             }
+        }
+
+        /// <summary>
+        /// get the next reliable id
+        /// </summary>
+        /// <returns></returns>
+        protected int GetNextPingId()
+        {
+            int id = this.NextPingId++;
+            if (this.NextPingId > int.MaxValue)
+            {
+                this.NextPingId = 1;
+            }
+
+            return id;
         }
     }
 }

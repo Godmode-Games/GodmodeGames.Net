@@ -5,7 +5,9 @@ using GodmodeGames.Net.Utilities;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using static GodmodeGames.Net.GGClient;
@@ -23,6 +25,19 @@ namespace GodmodeGames.Net.Transport.Udp
         private List<int> ReceivedMessagesBuffer = new List<int>();
 
         private string DisconnectReason = null;
+
+        /// <summary>
+        /// When was the last heartbeat sent?
+        /// </summary>
+        internal DateTime LastHeartbeat = DateTime.UtcNow;
+        /// <summary>
+        /// Internal message of the last heartbeat-message
+        /// </summary>
+        internal int LastHeartbeatId = -1;
+        /// <summary>
+        /// stopwatch to calcualte rtt
+        /// </summary>
+        private Stopwatch HeartbeatStopwatch = new Stopwatch();
 
         public int RTT { get; set; } = -1;
 
@@ -163,6 +178,23 @@ namespace GodmodeGames.Net.Transport.Udp
                 tick.OnTick?.Invoke();
             }
 
+            if (this.LastHeartbeat.AddMilliseconds(this.SocketSettings.HeartbeatInterval) < DateTime.UtcNow)
+            {
+                UdpMessage msg = new UdpMessage
+                {
+                    MessageType = EMessageType.HeartBeat,
+                    MessageId = this.GetNextReliableId(),
+                    Data = new byte[0],
+                    RemoteEndpoint = this.RemoteEndpoint
+                };
+                this.LastHeartbeatId = msg.MessageId;
+                this.LastHeartbeat = DateTime.UtcNow;
+                this.HeartbeatStopwatch.Restart();
+
+                this.Send(msg);
+            }
+
+            //check timeout
             if (DateTime.UtcNow.Subtract(this.Statistics.LastDataReceived).TotalSeconds > this.SocketSettings.TimeoutTime)
             {
                 this.StopReceive();
@@ -296,6 +328,7 @@ namespace GodmodeGames.Net.Transport.Udp
                         this.ConnectAttempt?.Invoke(true);
                     }
                 });
+                this.LastHeartbeat = DateTime.UtcNow.Subtract(TimeSpan.FromMilliseconds(this.SocketSettings.HeartbeatInterval - 1000)); //first heartbeat 1 second after connect
             }
             else if (msg.MessageType == EMessageType.Disconnect && this.ConnectionStatus > EConnectionStatus.NotConnected && this.ConnectionStatus < EConnectionStatus.Disconnected)
             {
@@ -311,15 +344,6 @@ namespace GodmodeGames.Net.Transport.Udp
                         this.StopReceive();
                     }
                 });
-            }
-            else if (msg.MessageType == EMessageType.HeartBeat)
-            {
-                int ping = -1;
-                if (msg.Data.Length >= 4)
-                {
-                    ping = BitConverter.ToInt32(msg.Data);
-                }
-                this.RTT = ping;
             }
         }
 
@@ -342,6 +366,19 @@ namespace GodmodeGames.Net.Transport.Udp
                         this.StopReceive();
                     }
                 });
+            }
+            else if (msg.MessageType == EMessageType.HeartBeat)
+            {
+                //got the heartbeat response
+                if (this.LastHeartbeatId == msg.MessageId)
+                {
+                    this.HeartbeatStopwatch.Stop();
+                    this.RTT = (int)this.HeartbeatStopwatch.ElapsedMilliseconds;
+
+                    //reset
+                    this.LastHeartbeatId = -1;
+                    this.LastHeartbeat = DateTime.UtcNow;
+                }
             }
         }
 

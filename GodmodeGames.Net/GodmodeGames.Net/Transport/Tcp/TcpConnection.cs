@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
@@ -73,9 +74,9 @@ namespace GodmodeGames.Net.Transport.Tcp
             return true;
         }
 
-        public void Disconnect(string reason = null)
+        public void Disconnect(bool send_msg, string reason = null)
         {
-            if (!string.IsNullOrEmpty(reason))
+            if (!string.IsNullOrEmpty(reason) && send_msg)
             {
                 TcpMessage disc = new TcpMessage
                 {
@@ -91,6 +92,11 @@ namespace GodmodeGames.Net.Transport.Tcp
             this.Server?.RemoveClient(this.Connection, reason);
 
             this.StopReceive();
+        }
+
+        public void Disconnect(string reason = null)
+        {
+            this.Disconnect(true, reason);
         }
 
         public void Send(byte[] data)
@@ -148,7 +154,6 @@ namespace GodmodeGames.Net.Transport.Tcp
             {
                 if (this.Socket == null)
                 {
-                    this.Disconnect();
                     return;
                 }
 
@@ -191,12 +196,16 @@ namespace GodmodeGames.Net.Transport.Tcp
             catch (AuthenticationException)
             {
                 this.Server?.Logger?.LogError("ssl authentication failed - closing the connection to client " + this.Connection.ToString());
-                this.Disconnect();
+                this.Disconnect(false, "ssl-auth failed");
+            }
+            catch (IOException e)
+            {
+                this.Disconnect(false, "connection closed");
             }
             catch (Exception ex)
             {
                 this.Server?.Logger?.LogError("error while receiving data from " + this.Connection.ToString() + ": " + ex.Message);
-                this.Disconnect();
+                this.Disconnect(false, "error while receive data");
             }
         }
     }

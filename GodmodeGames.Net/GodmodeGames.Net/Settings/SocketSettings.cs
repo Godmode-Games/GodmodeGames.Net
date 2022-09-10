@@ -21,6 +21,10 @@
         /// </summary>
         public int SendBufferSize = 1024 * 1024;
         /// <summary>
+        /// Heartbeat interval in milliseconds
+        /// </summary>
+        public int HeartbeatInterval = 5000;
+        /// <summary>
         /// Simulate packet lost while sending packets (in percent 0 - 100)
         /// </summary>
         public int SimulatedPacketLostSend = 0;
