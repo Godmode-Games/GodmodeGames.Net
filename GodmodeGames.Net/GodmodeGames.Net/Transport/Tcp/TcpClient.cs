@@ -49,6 +49,7 @@ namespace GodmodeGames.Net.Transport.Tcp
         private Task SendTask = null;
 
         private int NextPingId = 1;
+        private DateTime NextTickCheck = DateTime.UtcNow;
 
         /// <summary>
         /// When was the last heartbeat sent?
@@ -69,6 +70,7 @@ namespace GodmodeGames.Net.Transport.Tcp
             this.Logger = logger;
             this.CTS = new CancellationTokenSource();
             this.ConnectionStatus = EConnectionStatus.NotConnected;
+            this.NextTickCheck = DateTime.UtcNow;
         }
 
         public bool Connect(IPEndPoint endpoint)
@@ -215,27 +217,32 @@ namespace GodmodeGames.Net.Transport.Tcp
                 tick.OnTick?.Invoke();
             }
 
-            if (this.LastHeartbeat.AddMilliseconds(this.SocketSettings.HeartbeatInterval) < DateTime.UtcNow)
+            if (this.NextTickCheck <= DateTime.UtcNow)
             {
-                int pingid = this.GetNextPingId();
-                TcpMessage msg = new TcpMessage
+                this.NextTickCheck = DateTime.UtcNow.AddMilliseconds(this.SocketSettings.TickCheckRate);
+
+                if (this.LastHeartbeat.AddMilliseconds(this.SocketSettings.HeartbeatInterval) < DateTime.UtcNow)
                 {
-                    MessageType = EMessageType.HeartBeatPing,
-                    Data = BitConverter.GetBytes(pingid),
-                    Client = null
-                };
-                this.LastHeartbeatId = pingid;
-                this.LastHeartbeat = DateTime.UtcNow;
-                this.HeartbeatStopwatch.Restart();
+                    int pingid = this.GetNextPingId();
+                    TcpMessage msg = new TcpMessage
+                    {
+                        MessageType = EMessageType.HeartBeatPing,
+                        Data = BitConverter.GetBytes(pingid),
+                        Client = null
+                    };
+                    this.LastHeartbeatId = pingid;
+                    this.LastHeartbeat = DateTime.UtcNow;
+                    this.HeartbeatStopwatch.Restart();
 
-                this.OutgoingMessages.Enqueue(msg);
-            }
+                    this.OutgoingMessages.Enqueue(msg);
+                }
 
-            //check timeout
-            if (DateTime.UtcNow.Subtract(this.Statistics.LastDataReceived).TotalSeconds > this.SocketSettings.TimeoutTime)
-            {
-                this.StopReceive();
-                this.Disconnected?.Invoke(EDisconnectBy.ConnectionLost, "timeout");
+                //check timeout
+                if (DateTime.UtcNow.Subtract(this.Statistics.LastDataReceived).TotalSeconds > this.SocketSettings.TimeoutTime)
+                {
+                    this.StopReceive();
+                    this.Disconnected?.Invoke(EDisconnectBy.ConnectionLost, "timeout");
+                }
             }
         }
 
@@ -447,7 +454,7 @@ namespace GodmodeGames.Net.Transport.Tcp
                     this.StopReceive();
                 }
             }
-            catch (IOException e)
+            catch (IOException)
             {
                 this.TickEvents.Enqueue(new TickEvent()
                 {

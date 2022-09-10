@@ -25,6 +25,7 @@ namespace GodmodeGames.Net.Transport.Udp
         private List<int> ReceivedMessagesBuffer = new List<int>();
 
         private string DisconnectReason = null;
+        private DateTime NextTickCheck = DateTime.UtcNow;
 
         /// <summary>
         /// When was the last heartbeat sent?
@@ -56,6 +57,7 @@ namespace GodmodeGames.Net.Transport.Udp
         {
             base.Initialize((SocketSettings)settings, logger);
             this.ConnectionStatus = EConnectionStatus.NotConnected;
+            this.NextTickCheck = DateTime.UtcNow;
         }
 
         /// <summary>
@@ -178,27 +180,32 @@ namespace GodmodeGames.Net.Transport.Udp
                 tick.OnTick?.Invoke();
             }
 
-            if (this.LastHeartbeat.AddMilliseconds(this.SocketSettings.HeartbeatInterval) < DateTime.UtcNow)
+            if (this.NextTickCheck <= DateTime.UtcNow)
             {
-                UdpMessage msg = new UdpMessage
+                this.NextTickCheck = DateTime.UtcNow.AddMilliseconds(this.SocketSettings.TickCheckRate);
+
+                if (this.LastHeartbeat.AddMilliseconds(this.SocketSettings.HeartbeatInterval) < DateTime.UtcNow)
                 {
-                    MessageType = EMessageType.HeartBeat,
-                    MessageId = this.GetNextReliableId(),
-                    Data = new byte[0],
-                    RemoteEndpoint = this.RemoteEndpoint
-                };
-                this.LastHeartbeatId = msg.MessageId;
-                this.LastHeartbeat = DateTime.UtcNow;
-                this.HeartbeatStopwatch.Restart();
+                    UdpMessage msg = new UdpMessage
+                    {
+                        MessageType = EMessageType.HeartBeat,
+                        MessageId = this.GetNextReliableId(),
+                        Data = new byte[0],
+                        RemoteEndpoint = this.RemoteEndpoint
+                    };
+                    this.LastHeartbeatId = msg.MessageId;
+                    this.LastHeartbeat = DateTime.UtcNow;
+                    this.HeartbeatStopwatch.Restart();
 
-                this.Send(msg);
-            }
+                    this.Send(msg);
+                }
 
-            //check timeout
-            if (DateTime.UtcNow.Subtract(this.Statistics.LastDataReceived).TotalSeconds > this.SocketSettings.TimeoutTime)
-            {
-                this.StopReceive();
-                this.Disconnected?.Invoke(EDisconnectBy.ConnectionLost, "timeout");
+                //check timeout
+                if (DateTime.UtcNow.Subtract(this.Statistics.LastDataReceived).TotalSeconds > this.SocketSettings.TimeoutTime)
+                {
+                    this.StopReceive();
+                    this.Disconnected?.Invoke(EDisconnectBy.ConnectionLost, "timeout");
+                }
             }
         }
 

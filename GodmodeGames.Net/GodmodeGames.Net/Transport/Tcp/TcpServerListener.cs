@@ -44,12 +44,14 @@ namespace GodmodeGames.Net.Transport.Tcp
         private CancellationTokenSource CTS = null;
 
         private int NextPingId = 1;
+        private DateTime NextTickCheck = DateTime.UtcNow;
 
         public void Inititalize(ServerSocketSettings settings, ILogger logger)
         {
             this.SocketSettings = settings;
             this.Logger = logger;
             this.ListeningStatus = EListeningStatus.NotListening;
+            this.NextTickCheck = DateTime.UtcNow;
         }
 
         public void StartListening(IPEndPoint endpoint)
@@ -147,36 +149,41 @@ namespace GodmodeGames.Net.Transport.Tcp
                 tick.OnTick?.Invoke();
             }
 
-            List<KeyValuePair<IPEndPoint, GGConnection>> timeout = new List<KeyValuePair<IPEndPoint, GGConnection>>();
-            int heartbeat = this.SocketSettings.HeartbeatInterval;
-            //disconnect timed out connections and send heartbeat
-            foreach (KeyValuePair<IPEndPoint, GGConnection> kvp in this.Connections)
+            if (this.NextTickCheck <= DateTime.UtcNow)
             {
-                if (kvp.Value.Statistics.LastDataReceived.AddMilliseconds(this.SocketSettings.TimeoutTime) < DateTime.UtcNow)
-                {
-                    timeout.Add(kvp);
-                }
+                this.NextTickCheck = DateTime.UtcNow.AddMilliseconds(this.SocketSettings.TickCheckRate);
 
-                if (kvp.Value.LastHeartbeat.AddMilliseconds(heartbeat) < DateTime.UtcNow)
+                List<KeyValuePair<IPEndPoint, GGConnection>> timeout = new List<KeyValuePair<IPEndPoint, GGConnection>>();
+                int heartbeat = this.SocketSettings.HeartbeatInterval;
+                //disconnect timed out connections and send heartbeat
+                foreach (KeyValuePair<IPEndPoint, GGConnection> kvp in this.Connections)
                 {
-                    int pingid = this.GetNextPingId();
-                    TcpMessage msg = new TcpMessage
+                    if (kvp.Value.Statistics.LastDataReceived.AddMilliseconds(this.SocketSettings.TimeoutTime) < DateTime.UtcNow)
                     {
-                        MessageType = EMessageType.HeartBeatPing,
-                        Data = BitConverter.GetBytes(pingid),
-                        Client = kvp.Value
-                    };
-                    kvp.Value.StartHeartbeat(pingid);
-                    this.OutgoingMessages.Enqueue(msg);
+                        timeout.Add(kvp);
+                    }
+
+                    if (kvp.Value.LastHeartbeat.AddMilliseconds(heartbeat) < DateTime.UtcNow)
+                    {
+                        int pingid = this.GetNextPingId();
+                        TcpMessage msg = new TcpMessage
+                        {
+                            MessageType = EMessageType.HeartBeatPing,
+                            Data = BitConverter.GetBytes(pingid),
+                            Client = kvp.Value
+                        };
+                        kvp.Value.StartHeartbeat(pingid);
+                        this.OutgoingMessages.Enqueue(msg);
+                    }
                 }
-            }
-            if (timeout.Count > 0)
-            {
-                foreach (KeyValuePair<IPEndPoint, GGConnection> kvp in timeout)
+                if (timeout.Count > 0)
                 {
-                    this.RemoveClient(kvp.Value, "timeout");
+                    foreach (KeyValuePair<IPEndPoint, GGConnection> kvp in timeout)
+                    {
+                        this.RemoveClient(kvp.Value, "timeout");
+                    }
+                    this.Logger?.LogInfo(timeout.Count + " connections timed out.");
                 }
-                this.Logger?.LogInfo(timeout.Count + " connections timed out.");
             }
         }
 

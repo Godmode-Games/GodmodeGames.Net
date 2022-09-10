@@ -25,13 +25,17 @@
         /// </summary>
         public int HeartbeatInterval = 5000;
         /// <summary>
-        /// Simulate packet lost while sending packets (in percent 0 - 100)
+        /// how often does the Tick()-Method do internal stuff (in milliseconds)
         /// </summary>
-        public int SimulatedPacketLostSend = 0;
+        public int TickCheckRate = 500;
+        /// <summary>
+        /// Simulate packet lost while sending packets via udp (in percent 0 - 100)
+        /// </summary>
+        public int SimulatedUdpPacketLostSend = 0;
         /// <summary>
         /// Simulate packet lost while receiving packets (in percent 0 - 100)
         /// </summary>
-        public int SimulatedPacketLostReceive = 0;
+        public int SimulatedUdpPacketLostReceive = 0;
         /// <summary>
         /// Simulate ping on sending packets (in milliseconds)
         /// </summary>

@@ -121,11 +121,11 @@ namespace GodmodeGames.Net.Transport.Udp
                         {
                             this.UpdateStatisticsReceive(numOfReceivedBytes, (IPEndPoint)endPoint);
 
-                            if (this.SocketSettings.SimulatedPacketLostReceive > 0)
+                            if (this.SocketSettings.SimulatedUdpPacketLostReceive > 0)
                             {
                                 //simulate packet lost
                                 int percent = new Random().Next(0, 101);
-                                int packetlost = Math.Clamp(this.SocketSettings.SimulatedPacketLostReceive, 0, 100);
+                                int packetlost = Math.Clamp(this.SocketSettings.SimulatedUdpPacketLostReceive, 0, 100);
                                 if (percent < packetlost)
                                 {
                                     this.Logger?.LogWarning("Simulate receive Packetlost...");
@@ -247,11 +247,11 @@ namespace GodmodeGames.Net.Transport.Udp
 
         protected void InternalSendTo(UdpMessage msg)
         {
-            if (this.SocketSettings.SimulatedPacketLostSend > 0)
+            if (this.SocketSettings.SimulatedUdpPacketLostSend > 0)
             {
                 //simulate packet lost
                 int percent = new Random().Next(0, 101);
-                int packetlost = Math.Clamp(this.SocketSettings.SimulatedPacketLostSend, 0, 100);
+                int packetlost = Math.Clamp(this.SocketSettings.SimulatedUdpPacketLostSend, 0, 100);
                 if (percent < packetlost)
                 {
                     this.Logger?.LogWarning("Simulate send packet-lost...");
@@ -268,7 +268,7 @@ namespace GodmodeGames.Net.Transport.Udp
 
             if (this.SocketSettings.SimulatedPing > 0)
             {
-                //Simulate ping, re-queue the packet until it can be send
+                //Simulate ping, re-queue the packet until it should be send
                 if (msg.AddedSimulatedPing == false)
                 {
                     msg.ProcessTime = DateTime.UtcNow.AddMilliseconds(this.SocketSettings.SimulatedPing);

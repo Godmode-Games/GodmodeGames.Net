@@ -23,6 +23,7 @@ namespace GodmodeGames.Net.Transport.Udp
         private ConcurrentDictionary<GGConnection, PendingDisconnect> PendingDisconnects = new ConcurrentDictionary<GGConnection, PendingDisconnect>();
 
         private ConcurrentQueue<TickEvent> TickEvents = new ConcurrentQueue<TickEvent>();//Event that should be invoked in Tick-method
+        private DateTime NextTickCheck = DateTime.UtcNow;
 
         public event ClientConnectHandler ClientConnected;
         public event ClientDisconnectHandler ClientDisconnected;
@@ -38,7 +39,8 @@ namespace GodmodeGames.Net.Transport.Udp
         {
             base.Initialize((SocketSettings)settings, logger);
             this.ListeningStatus = EListeningStatus.NotListening;
-        }
+            this.NextTickCheck = DateTime.UtcNow;
+    }
 
         /// <summary>
         /// start listening on an port
@@ -111,56 +113,61 @@ namespace GodmodeGames.Net.Transport.Udp
                 tick.OnTick?.Invoke();
             }
 
-            List<KeyValuePair<IPEndPoint, GGConnection>> timeout = new List<KeyValuePair<IPEndPoint, GGConnection>>();
-            int heartbeat = this.SocketSettings.HeartbeatInterval;
-            //disconnect timed out connections and send heartbeat
-            foreach (KeyValuePair<IPEndPoint, GGConnection> kvp in this.Connections)
+            if (this.NextTickCheck <= DateTime.UtcNow)
             {
-                if (kvp.Value.Statistics.LastDataReceived.AddMilliseconds(this.SocketSettings.TimeoutTime) < DateTime.UtcNow)
-                {
-                    timeout.Add(kvp);
-                }
+                this.NextTickCheck = DateTime.UtcNow.AddMilliseconds(this.SocketSettings.TickCheckRate);
 
-                if (kvp.Value.LastHeartbeat.AddMilliseconds(heartbeat) < DateTime.UtcNow)
+                List<KeyValuePair<IPEndPoint, GGConnection>> timeout = new List<KeyValuePair<IPEndPoint, GGConnection>>();
+                int heartbeat = this.SocketSettings.HeartbeatInterval;
+                //disconnect timed out connections and send heartbeat
+                foreach (KeyValuePair<IPEndPoint, GGConnection> kvp in this.Connections)
                 {
-                    UdpMessage msg = new UdpMessage
+                    if (kvp.Value.Statistics.LastDataReceived.AddMilliseconds(this.SocketSettings.TimeoutTime) < DateTime.UtcNow)
                     {
-                        MessageType = EMessageType.HeartBeat,
-                        MessageId = this.GetNextReliableId(),
-                        Data = new byte[0],
-                        RemoteEndpoint = kvp.Key
-                    };
-                    kvp.Value.StartHeartbeat(msg.MessageId);
-                    this.Send(msg);
-                }
-            }
-            if (timeout.Count > 0)
-            {
-                foreach (KeyValuePair<IPEndPoint, GGConnection> kvp in timeout)
-                {
-                    this.ClientDisconnected?.Invoke(kvp.Value, "timeout");
-                    this.RemoveClient(kvp.Value);
-                }
-                this.Logger?.LogInfo(timeout.Count + " connections timed out.");
-            }
+                        timeout.Add(kvp);
+                    }
 
-            //Remove old pending disconnects and force disconnect
-            Dictionary<GGConnection, PendingDisconnect> remove = new Dictionary<GGConnection, PendingDisconnect>();
-            foreach (KeyValuePair<GGConnection, PendingDisconnect> kvp in this.PendingDisconnects)
-            {
-                if (DateTime.UtcNow.Subtract(kvp.Value.SendRequest).TotalMilliseconds > ((ServerSocketSettings)this.SocketSettings).UdpPendingDisconnectsTimeout)
-                {
-                    remove.Add(kvp.Key, kvp.Value);
+                    if (kvp.Value.LastHeartbeat.AddMilliseconds(heartbeat) < DateTime.UtcNow)
+                    {
+                        UdpMessage msg = new UdpMessage
+                        {
+                            MessageType = EMessageType.HeartBeat,
+                            MessageId = this.GetNextReliableId(),
+                            Data = new byte[0],
+                            RemoteEndpoint = kvp.Key
+                        };
+                        kvp.Value.StartHeartbeat(msg.MessageId);
+                        this.Send(msg);
+                    }
                 }
-            }
-
-            if (remove.Count > 0)
-            {
-                foreach (KeyValuePair<GGConnection, PendingDisconnect> kvp in remove)
+                if (timeout.Count > 0)
                 {
-                    this.PendingDisconnects.Remove(kvp.Key, out _);
-                    this.ClientDisconnected?.Invoke(kvp.Key, kvp.Value.Reason);
-                    this.RemoveClient(kvp.Key);
+                    foreach (KeyValuePair<IPEndPoint, GGConnection> kvp in timeout)
+                    {
+                        this.ClientDisconnected?.Invoke(kvp.Value, "timeout");
+                        this.RemoveClient(kvp.Value);
+                    }
+                    this.Logger?.LogInfo(timeout.Count + " connections timed out.");
+                }
+
+                //Remove old pending disconnects and force disconnect
+                Dictionary<GGConnection, PendingDisconnect> remove = new Dictionary<GGConnection, PendingDisconnect>();
+                foreach (KeyValuePair<GGConnection, PendingDisconnect> kvp in this.PendingDisconnects)
+                {
+                    if (DateTime.UtcNow.Subtract(kvp.Value.SendRequest).TotalMilliseconds > ((ServerSocketSettings)this.SocketSettings).UdpPendingDisconnectsTimeout)
+                    {
+                        remove.Add(kvp.Key, kvp.Value);
+                    }
+                }
+
+                if (remove.Count > 0)
+                {
+                    foreach (KeyValuePair<GGConnection, PendingDisconnect> kvp in remove)
+                    {
+                        this.PendingDisconnects.Remove(kvp.Key, out _);
+                        this.ClientDisconnected?.Invoke(kvp.Key, kvp.Value.Reason);
+                        this.RemoveClient(kvp.Key);
+                    }
                 }
             }
         }
