@@ -27,7 +27,7 @@ namespace GodmodeGames.Net
         /// <summary>
         /// Statistics of the connection
         /// </summary>
-        public ClientStatistics Statistics = new ClientStatistics();
+        public GGStatistics Statistics = new GGStatistics();
         /// <summary>
         /// Transport layer 
         /// </summary>

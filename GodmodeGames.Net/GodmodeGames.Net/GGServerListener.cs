@@ -35,7 +35,7 @@ namespace GodmodeGames.Net
         /// <summary>
         /// Server statistics
         /// </summary>
-        public ServerStatistics Statistics => this.Transport?.Statistics;
+        public GGStatistics Statistics => this.Transport?.Statistics;
 
         #region Events
         public delegate void ClientConnectHandler(GGConnection connection);

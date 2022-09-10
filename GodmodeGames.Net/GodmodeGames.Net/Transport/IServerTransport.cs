@@ -14,7 +14,7 @@ namespace GodmodeGames.Net.Transport
         /// <summary>
         /// Send- and Receive-statistics
         /// </summary>
-        ServerStatistics Statistics { get; set; }
+        GGStatistics Statistics { get; set; }
 
         #region Events
         delegate void ClientConnectHandler(GGConnection connection);

@@ -8,7 +8,7 @@ namespace GodmodeGames.Net.Transport
 {
     internal interface IClientTransport
     {
-        ClientStatistics Statistics { get; set; }
+        GGStatistics Statistics { get; set; }
         
         public enum EConnectionStatus : byte { NotConnected, Connecting, Connected, Disconnecting, Disconnected }
         EConnectionStatus ConnectionStatus { get; set; }

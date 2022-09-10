@@ -17,7 +17,7 @@ namespace GodmodeGames.Net.Transport.Udp
     {
         public EListeningStatus ListeningStatus { get; set; }
 
-        public ServerStatistics Statistics { get; set; } = new ServerStatistics();
+        public GGStatistics Statistics { get; set; } = new GGStatistics();
         public ConcurrentDictionary<IPEndPoint, GGConnection> Connections { get; set; } = new ConcurrentDictionary<IPEndPoint, GGConnection>();
 
         private ConcurrentDictionary<GGConnection, PendingDisconnect> PendingDisconnects = new ConcurrentDictionary<GGConnection, PendingDisconnect>();

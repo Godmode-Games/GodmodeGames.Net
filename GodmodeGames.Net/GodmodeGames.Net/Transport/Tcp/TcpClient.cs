@@ -23,7 +23,7 @@ namespace GodmodeGames.Net.Transport.Tcp
 {
     internal class TcpClient : IClientTransport
     {
-        public ClientStatistics Statistics { get; set; } = new ClientStatistics();
+        public GGStatistics Statistics { get; set; } = new GGStatistics();
         public EConnectionStatus ConnectionStatus { get; set; } = EConnectionStatus.NotConnected;
         public int RTT { get; set; } = -1;
 

@@ -20,7 +20,7 @@ namespace GodmodeGames.Net.Transport.Tcp
     internal class TcpServerListener : IServerTransport
     {
         public EListeningStatus ListeningStatus { get; set; } = EListeningStatus.NotListening;
-        public ServerStatistics Statistics { get; set; } = new ServerStatistics();
+        public GGStatistics Statistics { get; set; } = new GGStatistics();
         public ConcurrentDictionary<IPEndPoint, GGConnection> Connections { get; set; } = new ConcurrentDictionary<IPEndPoint, GGConnection>();
 
         #region Events

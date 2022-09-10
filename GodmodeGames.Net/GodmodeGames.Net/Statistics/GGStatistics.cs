@@ -2,7 +2,7 @@
 
 namespace GodmodeGames.Net.Transport.Statistics
 {
-    public abstract class PeerStatistics
+    public class GGStatistics
     {
         // <summary>
         /// Total amount of sent bytes

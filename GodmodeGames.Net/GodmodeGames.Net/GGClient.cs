@@ -40,7 +40,7 @@ namespace GodmodeGames.Net
         /// <summary>
         /// Client statistics
         /// </summary>
-        public ClientStatistics Statistics => this.Transport?.Statistics;
+        public GGStatistics Statistics => this.Transport?.Statistics;
         /// <summary>
         /// last ping-time of the connection
         /// </summary>

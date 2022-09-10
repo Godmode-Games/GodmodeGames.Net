@@ -7,7 +7,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using static GodmodeGames.Net.GGClient;
@@ -18,7 +17,7 @@ namespace GodmodeGames.Net.Transport.Udp
 {
     internal class UdpClient : UdpPeer, IClientTransport
     {
-        public ClientStatistics Statistics { get; set; } = new ClientStatistics();
+        public GGStatistics Statistics { get; set; } = new GGStatistics();
         public EConnectionStatus ConnectionStatus { get; set; } = EConnectionStatus.NotConnected;
 
         private ConcurrentQueue<TickEvent> TickEvents = new ConcurrentQueue<TickEvent>();//Event that should be invoked in Tick-method
