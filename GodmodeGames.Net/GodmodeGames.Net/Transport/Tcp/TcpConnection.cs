@@ -5,7 +5,6 @@ using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Text;
 
-//https://github.com/Die-SpieleBauer/reforged/blob/master/Reforged/NetworkingProjects/LoginServer/Network/SSLClient.cs
 namespace GodmodeGames.Net.Transport.Tcp
 {
     internal class TcpConnection : IConnectionTransport
@@ -25,6 +24,12 @@ namespace GodmodeGames.Net.Transport.Tcp
             this.Connection = connection;
         }
 
+        /// <summary>
+        /// Initialize Client and streams
+        /// </summary>
+        /// <param name="client"></param>
+        /// <param name="server"></param>
+        /// <returns></returns>
         public bool Initialize(System.Net.Sockets.TcpClient client, TcpServerListener server)
         {
             this.Socket = client;
@@ -74,11 +79,16 @@ namespace GodmodeGames.Net.Transport.Tcp
             return true;
         }
 
+        /// <summary>
+        /// Disconnect the client with a reason
+        /// </summary>
+        /// <param name="send_msg"></param>
+        /// <param name="reason"></param>
         public void Disconnect(bool send_msg, string reason = null)
         {
             if (!string.IsNullOrEmpty(reason) && send_msg)
             {
-                TcpMessage disc = new TcpMessage
+                TcpMessage disc = new TcpMessage()
                 {
                     MessageType = TcpMessage.EMessageType.Disconnect,
                     Data = Encoding.UTF8.GetBytes(reason),
@@ -94,27 +104,45 @@ namespace GodmodeGames.Net.Transport.Tcp
             this.StopReceive();
         }
 
+        /// <summary>
+        /// Disconnect the client with a reason
+        /// </summary>
+        /// <param name="reason"></param>
         public void Disconnect(string reason = null)
         {
             this.Disconnect(true, reason);
         }
 
+        /// <summary>
+        /// Sends Data to the Client
+        /// </summary>
+        /// <param name="data"></param>
         public void Send(byte[] data)
         {
             this.Server?.Send(data, this.Connection);
         }
 
+        /// <summary>
+        /// Sends Data to a Client
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="reliable"></param>
         public void Send(byte[] data, bool reliable = true)
         {
             this.Send(data);
         }
 
+        /// <summary>
+        /// Sends data to the client via the socket
+        /// </summary>
+        /// <param name="data"></param>
         internal void SendToClient(byte[] data)
         {
             if (this.Socket == null)
             {
                 return;
             }
+
             if (this.UseSSL == true)
             {
                 this.mySSLStream.Write(data);
@@ -125,8 +153,13 @@ namespace GodmodeGames.Net.Transport.Tcp
                 this.myStream.Write(data);
                 this.myStream.Flush();
             }
+
+            this.Connection.Statistics.UpdateSentStatistics(data.Length);
         }
 
+        /// <summary>
+        /// Close the connection
+        /// </summary>
         private void StopReceive()
         {
             if (this.Socket != null)
@@ -148,6 +181,10 @@ namespace GodmodeGames.Net.Transport.Tcp
             }
         }
 
+        /// <summary>
+        /// callback for receiving data
+        /// </summary>
+        /// <param name="ar"></param>
         private void OnReceiveData(IAsyncResult ar)
         {
             try
@@ -177,7 +214,9 @@ namespace GodmodeGames.Net.Transport.Tcp
                 Array.Resize(ref newbytes, readbytes);
                 Buffer.BlockCopy(this.readBuff, 0, newbytes, 0, readbytes);
 
-                this.Server.ClientDataReceived(newbytes, this.Connection);
+                this.Connection.Statistics.UpdateReceiveStatistics(newbytes.Length);
+
+                this.Server.ClientDataReceived(newbytes, this.Connection);               
 
                 if (this.Socket == null)
                 {
@@ -198,7 +237,7 @@ namespace GodmodeGames.Net.Transport.Tcp
                 this.Server?.Logger?.LogError("ssl authentication failed - closing the connection to client " + this.Connection.ToString());
                 this.Disconnect(false, "ssl-auth failed");
             }
-            catch (IOException e)
+            catch (IOException)
             {
                 this.Disconnect(false, "connection closed");
             }

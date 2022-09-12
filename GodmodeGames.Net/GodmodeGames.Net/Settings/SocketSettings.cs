@@ -31,15 +31,19 @@
         /// <summary>
         /// Simulate packet lost while sending packets via udp (in percent 0 - 100)
         /// </summary>
-        public int SimulatedUdpPacketLostSend = 0;
+        public int SimulatedUdpPacketLostOutgoing = 0;
         /// <summary>
         /// Simulate packet lost while receiving packets (in percent 0 - 100)
         /// </summary>
-        public int SimulatedUdpPacketLostReceive = 0;
+        public int SimulatedUdpPacketLostIncomming = 0;
         /// <summary>
         /// Simulate ping on sending packets (in milliseconds)
         /// </summary>
-        public int SimulatedPing = 0;
+        public int SimulatedPingOutgoing = 0;
+        /// <summary>
+        /// Simulate ping on receiving packets (in milliseconds)
+        /// </summary>
+        public int SimulatedPingIncomming = 0;
 
 
         /// <summary>

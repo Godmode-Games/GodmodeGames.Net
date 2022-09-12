@@ -13,7 +13,7 @@ namespace GodmodeGames.Net.SampleServer
         static GGServerListener Server = null;
         static async Task Main(string[] args)
         {
-            Server = new GGServerListener(new ServerSocketSettings { Transport = SocketSettings.ETransport.Tcp }, new ConsoleLogger());
+            Server = new GGServerListener(new ServerSocketSettings { Transport = SocketSettings.ETransport.Udp }, new ConsoleLogger());
 
             Server.ReceivedData += OnData;
             Server.ClientConnected += OnClientConnect;

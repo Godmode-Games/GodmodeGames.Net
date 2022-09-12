@@ -129,7 +129,7 @@ namespace GodmodeGames.Net.Transport.Udp
 
                     if (kvp.Value.LastHeartbeat.AddMilliseconds(heartbeat) < DateTime.UtcNow)
                     {
-                        UdpMessage msg = new UdpMessage
+                        UdpMessage msg = new UdpMessage()
                         {
                             MessageType = EMessageType.HeartBeat,
                             MessageId = this.GetNextReliableId(),
@@ -204,7 +204,7 @@ namespace GodmodeGames.Net.Transport.Udp
                 }
 
                 UdpMessage message = new UdpMessage(data, msgid, connection.ClientEndpoint, EMessageType.Data);
-                this.OutgoingMessages.Enqueue(message);
+                this.Send(message);
             }
         }
 
@@ -247,14 +247,14 @@ namespace GodmodeGames.Net.Transport.Udp
                         data = Encoding.UTF8.GetBytes(reason);
                     }
 
-                    UdpMessage disc = new UdpMessage
+                    UdpMessage disc = new UdpMessage()
                     {
                         MessageType = EMessageType.Disconnect,
                         MessageId = this.GetNextReliableId(),
                         RemoteEndpoint = connection.ClientEndpoint,
                         Data = data
                     };
-                    this.OutgoingMessages.Enqueue(disc);
+                    this.Send(disc);
                 }
             }
         }
@@ -359,8 +359,8 @@ namespace GodmodeGames.Net.Transport.Udp
             //internal message
             if (msg.MessageType == EMessageType.DiscoverRequest && this.ListeningStatus > EListeningStatus.NotListening && this.ListeningStatus < EListeningStatus.ShuttingDown)
             {
-                UdpMessage ret = new UdpMessage { MessageType = EMessageType.DiscoverResponse, MessageId = this.GetNextReliableId(), RemoteEndpoint = msg.RemoteEndpoint };
-                this.OutgoingMessages.Enqueue(ret);
+                UdpMessage ret = new UdpMessage() { MessageType = EMessageType.DiscoverResponse, MessageId = this.GetNextReliableId(), RemoteEndpoint = msg.RemoteEndpoint };
+                this.InternalSendTo(ret);
             }
             else if (msg.MessageType == EMessageType.Disconnect)
             {

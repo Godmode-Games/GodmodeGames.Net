@@ -18,6 +18,7 @@ using System.IO;
 using GodmodeGames.Net.Utilities;
 using static GodmodeGames.Net.GGClient;
 using System.Diagnostics;
+using System.Collections.Generic;
 
 namespace GodmodeGames.Net.Transport.Tcp
 {
@@ -48,6 +49,15 @@ namespace GodmodeGames.Net.Transport.Tcp
         private ConcurrentQueue<TickEvent> TickEvents = new ConcurrentQueue<TickEvent>();//Event that should be invoked in Tick-method
         private Task SendTask = null;
 
+        /// <summary>
+        /// Messages that should be send with a simulated ping
+        /// </summary>
+        protected ConcurrentQueue<TcpMessage> PendingOutgoingMessages = new ConcurrentQueue<TcpMessage>();
+        /// <summary>
+        /// Messages that should be received with a simulated ping
+        /// </summary>
+        protected ConcurrentQueue<TcpMessage> PendingIncommingMessages = new ConcurrentQueue<TcpMessage>();
+
         private int NextPingId = 1;
         private DateTime NextTickCheck = DateTime.UtcNow;
 
@@ -64,6 +74,11 @@ namespace GodmodeGames.Net.Transport.Tcp
         /// </summary>
         private Stopwatch HeartbeatStopwatch = new Stopwatch();
 
+        /// <summary>
+        /// Initialize the Client
+        /// </summary>
+        /// <param name="settings"></param>
+        /// <param name="logger"></param>
         public void Inititalize(ClientSocketSettings settings, ILogger logger)
         {
             this.SocketSettings = settings;
@@ -73,6 +88,11 @@ namespace GodmodeGames.Net.Transport.Tcp
             this.NextTickCheck = DateTime.UtcNow;
         }
 
+        /// <summary>
+        /// Connect to a server endpoint
+        /// </summary>
+        /// <param name="endpoint"></param>
+        /// <returns></returns>
         public bool Connect(IPEndPoint endpoint)
         {
             if (endpoint == null)
@@ -98,6 +118,10 @@ namespace GodmodeGames.Net.Transport.Tcp
             return this.ConnectionStatus == EConnectionStatus.Connected;
         }
 
+        /// <summary>
+        /// Connect async to a server endpoint, check the ConnectAttempt-event for result
+        /// </summary>
+        /// <param name="endpoint"></param>
         public void ConnectAsync(IPEndPoint endpoint)
         {
             if (endpoint == null)
@@ -136,6 +160,11 @@ namespace GodmodeGames.Net.Transport.Tcp
             }
         }
 
+        /// <summary>
+        /// Disconnect from the server with a reason
+        /// </summary>
+        /// <param name="reason"></param>
+        /// <returns></returns>
         public bool Disconnect(string reason = null)
         {
             this.DisconnectAsync(reason);
@@ -155,6 +184,10 @@ namespace GodmodeGames.Net.Transport.Tcp
             return this.ConnectionStatus == EConnectionStatus.Disconnected;
         }
 
+        /// <summary>
+        /// Disconnect async from the server with a reason, check the Disconnected-event for finish
+        /// </summary>
+        /// <param name="reason"></param>
         public void DisconnectAsync(string reason = null)
         {
             if (this.ConnectionStatus >= EConnectionStatus.Disconnecting)
@@ -170,7 +203,7 @@ namespace GodmodeGames.Net.Transport.Tcp
                 data = Encoding.UTF8.GetBytes(reason);
             }
 
-            TcpMessage disc = new TcpMessage
+            TcpMessage disc = new TcpMessage()
             {
                 MessageType = EMessageType.Disconnect,
                 Data = data,
@@ -191,17 +224,29 @@ namespace GodmodeGames.Net.Transport.Tcp
             });
         }
 
+        /// <summary>
+        /// Sends a byte-array to server
+        /// </summary>
+        /// <param name="data"></param>
         public void Send(byte[] data)
         {
             TcpMessage msg = new TcpMessage(data, null, TcpMessage.EMessageType.Data);
-            this.OutgoingMessages.Enqueue(msg);
+            this.Send(msg);
         }
 
+        /// <summary>
+        /// Sends a byte-array to server
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="reliable"></param>
         public void Send(byte[] data, bool reliable = true)
         {
             this.Send(data);
         }
 
+        /// <summary>
+        /// have to be executed in update loop
+        /// </summary>
         public void Tick()
         {
             if (this.IncommingMessages.Count > 0)
@@ -224,7 +269,7 @@ namespace GodmodeGames.Net.Transport.Tcp
                 if (this.LastHeartbeat.AddMilliseconds(this.SocketSettings.HeartbeatInterval) < DateTime.UtcNow)
                 {
                     int pingid = this.GetNextPingId();
-                    TcpMessage msg = new TcpMessage
+                    TcpMessage msg = new TcpMessage()
                     {
                         MessageType = EMessageType.HeartBeatPing,
                         Data = BitConverter.GetBytes(pingid),
@@ -234,7 +279,7 @@ namespace GodmodeGames.Net.Transport.Tcp
                     this.LastHeartbeat = DateTime.UtcNow;
                     this.HeartbeatStopwatch.Restart();
 
-                    this.OutgoingMessages.Enqueue(msg);
+                    this.Send(msg);
                 }
 
                 //check timeout
@@ -246,12 +291,17 @@ namespace GodmodeGames.Net.Transport.Tcp
             }
         }
 
+        /// <summary>
+        /// stop tasks and close socket
+        /// </summary>
         private void StopReceive()
         {
             if (this.Socket != null)
             {
                 this.OutgoingMessages.Clear();
                 this.IncommingMessages.Clear();
+                this.PendingIncommingMessages.Clear();
+                this.PendingOutgoingMessages.Clear();
 
                 try
                 {
@@ -269,6 +319,28 @@ namespace GodmodeGames.Net.Transport.Tcp
             this.ConnectionStatus = EConnectionStatus.Disconnected;
         }
 
+        /// <summary>
+        /// Send a internal message to server
+        /// </summary>
+        /// <param name="msg"></param>
+        internal void Send(TcpMessage msg)
+        {
+            if (this.SocketSettings.SimulatedPingOutgoing > 0 && msg.SimulatedPingAdded == false)
+            {
+                msg.SetPing(this.SocketSettings.SimulatedPingOutgoing);
+                this.PendingOutgoingMessages.Enqueue(msg);
+            }
+            else
+            {
+                this.OutgoingMessages.Enqueue(msg);
+            }
+            this.StartSendingTask();
+        }
+
+        /// <summary>
+        /// Callback for connecting to the server
+        /// </summary>
+        /// <param name="result"></param>
         private void ConnectCallback(IAsyncResult result)
         {
             if (this.Socket != null)
@@ -380,6 +452,10 @@ namespace GodmodeGames.Net.Transport.Tcp
             }
         }
 
+        /// <summary>
+        /// Callback for receiving data from the server 
+        /// </summary>
+        /// <param name="result"></param>
         private void OnReceive(IAsyncResult result)
         {
             try
@@ -413,15 +489,9 @@ namespace GodmodeGames.Net.Transport.Tcp
                 this.asyncBuff = new byte[this.SocketSettings.ReceiveBufferSize];
 
                 TcpMessage msg = new TcpMessage();
-                msg.Deserialize(myBytes, null);
-
-                if (msg.MessageType == EMessageType.Data)
+                if (msg.Deserialize(myBytes, null))
                 {
-                    this.IncommingMessages.Enqueue(msg);
-                }
-                else
-                {
-                    this.ReceivedInternalMessage(msg);
+                    this.ProcessReceivedMessage(msg);
                 }
 
                 this.Statistics.UpdateReceiveStatistics(byteArray);
@@ -479,6 +549,9 @@ namespace GodmodeGames.Net.Transport.Tcp
             }
         }
 
+        /// <summary>
+        /// start the sending task, if not running
+        /// </summary>
         private void StartSendingTask()
         {
             if (this.SendTask != null && this.SendTask.Status != TaskStatus.Running)
@@ -496,18 +569,130 @@ namespace GodmodeGames.Net.Transport.Tcp
                 {
                     while (!this.CTS.IsCancellationRequested)
                     {
-                        while (this.OutgoingMessages.Count > 0 && this.OutgoingMessages.TryDequeue(out TcpMessage msg))
+                        Stopwatch stopwatch = new Stopwatch();
+                        stopwatch.Start();
+
+                        //Send Messages
+                        if (this.Socket != null && !this.OutgoingMessages.IsEmpty)
                         {
-                            this.InternalSendTo(msg);
+                            while (this.OutgoingMessages.Count > 0 && this.OutgoingMessages.TryDequeue(out TcpMessage msg))
+                            {
+                                this.InternalSendTo(msg);
+                            }
                         }
-                        Task.Delay(10);
+
+                        //Resend pending outgoing messages
+                        if (this.Socket != null && this.PendingOutgoingMessages.Count > 0 && !this.CTS.IsCancellationRequested)
+                        {
+                            List<TcpMessage> new_pending = new List<TcpMessage>();
+                            while (this.PendingOutgoingMessages.TryDequeue(out TcpMessage resend))
+                            {
+                                if (resend.ExecuteTime <= DateTime.UtcNow)
+                                {
+                                    this.InternalSendTo(resend);
+                                }
+                                else
+                                {
+                                    new_pending.Add(resend);
+                                }
+                            }
+                            if (new_pending.Count > 0)
+                            {
+                                foreach (TcpMessage msg in new_pending)
+                                {
+                                    this.PendingOutgoingMessages.Enqueue(msg);
+                                }
+                            }
+                        }
+
+                        //Dispatch pending incomming messages
+                        if (this.Socket != null && this.PendingIncommingMessages.Count > 0 && !this.CTS.IsCancellationRequested)
+                        {
+                            List<TcpMessage> new_pending = new List<TcpMessage>();
+                            while (this.PendingIncommingMessages.TryDequeue(out TcpMessage resend))
+                            {
+                                if (resend.ExecuteTime <= DateTime.UtcNow)
+                                {
+                                    this.ProcessReceivedMessage(resend);
+                                }
+                                else
+                                {
+                                    new_pending.Add(resend);
+                                }
+                            }
+
+                            if (new_pending.Count > 0)
+                            {
+                                foreach (TcpMessage msg in new_pending)
+                                {
+                                    this.PendingIncommingMessages.Enqueue(msg);
+                                }
+                            }
+                        }
+
+                        // if nothing to do, take a short break.
+                        stopwatch.Stop();
+
+                        var delay = this.SocketSettings.SendTickrate - stopwatch.ElapsedMilliseconds;
+                        if (!this.CTS.IsCancellationRequested && delay > 0)
+                        {
+                            Thread.Sleep((int)delay);
+                        }
                     }
                 });
             }
         }
 
+        /// <summary>
+        /// Handels incomming message
+        /// </summary>
+        /// <param name="msg"></param>
+        private void ProcessReceivedMessage(TcpMessage msg)
+        {
+            if (this.SocketSettings.SimulatedPingIncomming > 0 && msg.SimulatedPingAdded == false)
+            {
+                msg.SetPing(this.SocketSettings.SimulatedPingIncomming);
+                this.PendingIncommingMessages.Enqueue(msg);
+                return;
+            }
+
+            if (msg.ExecuteTime > DateTime.UtcNow)
+            {
+                //don't process yet
+                return;
+            }
+
+            if (msg.MessageType == EMessageType.Data)
+            {
+                this.IncommingMessages.Enqueue(msg);
+            }
+            else
+            {
+                this.ReceivedInternalMessage(msg);
+            }
+
+            return;
+        }
+
+        /// <summary>
+        /// Sends a message to the server 
+        /// </summary>
+        /// <param name="msg"></param>
         private void InternalSendTo(TcpMessage msg)
         {
+            if (this.SocketSettings.SimulatedPingOutgoing > 0 && msg.SimulatedPingAdded == false)
+            {
+                msg.SetPing(this.SocketSettings.SimulatedPingOutgoing);
+                this.PendingOutgoingMessages.Enqueue(msg);
+                return;
+            }
+
+            if (msg.ExecuteTime > DateTime.UtcNow)
+            {
+                //don't process yet
+                return;
+            }
+
             byte[] data = msg.Serialize();
             if (this.SocketSettings.TcpSSL == false)
             {
@@ -527,8 +712,13 @@ namespace GodmodeGames.Net.Transport.Tcp
             }
 
             this.Statistics.UpdateSentStatistics(data.Length);
+            return;
         }
 
+        /// <summary>
+        /// received an internal message from server
+        /// </summary>
+        /// <param name="msg"></param>
         private void ReceivedInternalMessage(TcpMessage msg)
         {
             if (msg.MessageType == EMessageType.Disconnect)
@@ -549,7 +739,7 @@ namespace GodmodeGames.Net.Transport.Tcp
                 //server requesting heartbeat
                 if (msg.Data.Length >= 4)
                 {
-                    TcpMessage pong = new TcpMessage
+                    TcpMessage pong = new TcpMessage()
                     {
                         Data = msg.Data,
                         Client = null,

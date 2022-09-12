@@ -3,17 +3,16 @@ using System.Linq;
 
 namespace GodmodeGames.Net.Transport.Tcp
 {
-    internal class TcpMessage
+    internal class TcpMessage : Message
     {
         internal enum EMessageType : byte { Data = 1, Disconnect = 2, HeartBeatPing = 3, HeartbeatPong = 4 }
         internal EMessageType MessageType = EMessageType.Data;
 
-        internal byte[] Data = new byte[0];
         internal GGConnection Client = null;
 
         internal TcpMessage()
         {
-
+            this.SetPing(0);
         }
 
         internal TcpMessage(byte[] data, GGConnection client, EMessageType type)
@@ -21,6 +20,7 @@ namespace GodmodeGames.Net.Transport.Tcp
             this.Data = data;
             this.MessageType = type;
             this.Client = client;
+            this.SetPing(0);
         }
 
         /// <summary>
@@ -55,7 +55,7 @@ namespace GodmodeGames.Net.Transport.Tcp
         /// returns the byte-array of the message
         /// </summary>
         /// <returns></returns>
-        internal byte[] Serialize()
+        internal override byte[] Serialize()
         {
             List<byte> ret = new List<byte>();
             ret.Add((byte)this.MessageType);

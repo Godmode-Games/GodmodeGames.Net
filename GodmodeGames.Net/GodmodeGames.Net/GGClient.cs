@@ -2,7 +2,6 @@
 using GodmodeGames.Net.Settings;
 using GodmodeGames.Net.Transport;
 using GodmodeGames.Net.Transport.Statistics;
-using System;
 using System.Net;
 using static GodmodeGames.Net.Transport.IClientTransport;
 

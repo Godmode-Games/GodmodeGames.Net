@@ -1,7 +1,6 @@
 ﻿using GodmodeGames.Net.Logging;
 using GodmodeGames.Net.Settings;
 using GodmodeGames.Net.Transport.Statistics;
-using GodmodeGames.Net.Transport.Udp;
 using GodmodeGames.Net.Utilities;
 using System;
 using System.Collections.Concurrent;
@@ -33,19 +32,38 @@ namespace GodmodeGames.Net.Transport.Tcp
         internal X509Certificate ServerCertificate = null;
         private IPEndPoint ServerEndpoint;
         private TcpListener Socket = null;
-        private ServerSocketSettings SocketSettings;
+        internal ServerSocketSettings SocketSettings;
         internal ILogger Logger;
 
         private ConcurrentQueue<TickEvent> TickEvents = new ConcurrentQueue<TickEvent>();//Event that should be invoked in Tick-method
 
+        /// <summary>
+        /// Messages received, but not processed
+        /// </summary>
         private ConcurrentQueue<TcpMessage> IncommingMessages = new ConcurrentQueue<TcpMessage>();
+        /// <summary>
+        /// Messages that should be sent
+        /// </summary>
         private ConcurrentQueue<TcpMessage> OutgoingMessages = new ConcurrentQueue<TcpMessage>();
+        /// <summary>
+        /// Messages that should be send with a simulated ping
+        /// </summary>
+        protected ConcurrentQueue<TcpMessage> PendingOutgoingMessages = new ConcurrentQueue<TcpMessage>();
+        /// <summary>
+        /// Messages that should be received with a simulated ping
+        /// </summary>
+        protected ConcurrentQueue<TcpMessage> PendingIncommingMessages = new ConcurrentQueue<TcpMessage>();
         private Task SendTask = null;
         private CancellationTokenSource CTS = null;
 
         private int NextPingId = 1;
         private DateTime NextTickCheck = DateTime.UtcNow;
 
+        /// <summary>
+        /// Initialize the server
+        /// </summary>
+        /// <param name="settings"></param>
+        /// <param name="logger"></param>
         public void Inititalize(ServerSocketSettings settings, ILogger logger)
         {
             this.SocketSettings = settings;
@@ -54,6 +72,10 @@ namespace GodmodeGames.Net.Transport.Tcp
             this.NextTickCheck = DateTime.UtcNow;
         }
 
+        /// <summary>
+        /// Start listening on a port
+        /// </summary>
+        /// <param name="endpoint"></param>
         public void StartListening(IPEndPoint endpoint)
         {
             this.CTS = new CancellationTokenSource();
@@ -84,24 +106,39 @@ namespace GodmodeGames.Net.Transport.Tcp
             this.ListeningStatus = EListeningStatus.Listening;
         }
 
+        /// <summary>
+        /// send byte-array to connection
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="connection"></param>
         public void Send(byte[] data, GGConnection connection)
         {
-            TcpMessage message = new TcpMessage
+            TcpMessage message = new TcpMessage()
             {
                 Data = data,
                 Client = connection,
                 MessageType = TcpMessage.EMessageType.Data
             };
-            this.OutgoingMessages.Enqueue(message);
 
-            this.StartSendingTask();
+            this.Send(message);
         }
 
+        /// <summary>
+        /// send byte-array to connection
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="connection"></param>
+        /// <param name="reliable"></param>
         public void Send(byte[] data, GGConnection connection, bool reliable = true)
         {
             this.Send(data, connection);
         }
 
+        /// <summary>
+        /// Shut the server down, disconnect all clients with a reason
+        /// </summary>
+        /// <param name="reason"></param>
+        /// <returns></returns>
         public bool Shutdown(string reason = "Shutdown")
         {
             this.ShutdownAsync(reason);
@@ -109,6 +146,10 @@ namespace GodmodeGames.Net.Transport.Tcp
             return true;
         }
 
+        /// <summary>
+        /// Shut the server down, disconnect all clients with a reason, check the ShutdownCompleted-event for finish
+        /// </summary>
+        /// <param name="reason"></param>
         public void ShutdownAsync(string reason)
         {
             this.ListeningStatus = EListeningStatus.ShuttingDown;
@@ -127,11 +168,19 @@ namespace GodmodeGames.Net.Transport.Tcp
             this.ShutdownCompleted?.Invoke();
         }
 
+        /// <summary>
+        /// Disconnect a client connection with a reason
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <param name="reason"></param>
         public void DisconnectClient(GGConnection connection, string reason = null)
         {
             ((TcpConnection)connection.Transport).Disconnect(reason);
         }
 
+        /// <summary>
+        /// have to be executed in update loop
+        /// </summary>
         public void Tick()
         {
             //Dispatcher messages
@@ -166,14 +215,14 @@ namespace GodmodeGames.Net.Transport.Tcp
                     if (kvp.Value.LastHeartbeat.AddMilliseconds(heartbeat) < DateTime.UtcNow)
                     {
                         int pingid = this.GetNextPingId();
-                        TcpMessage msg = new TcpMessage
+                        TcpMessage msg = new TcpMessage()
                         {
                             MessageType = EMessageType.HeartBeatPing,
                             Data = BitConverter.GetBytes(pingid),
                             Client = kvp.Value
                         };
                         kvp.Value.StartHeartbeat(pingid);
-                        this.OutgoingMessages.Enqueue(msg);
+                        this.Send(msg);
                     }
                 }
                 if (timeout.Count > 0)
@@ -187,6 +236,29 @@ namespace GodmodeGames.Net.Transport.Tcp
             }
         }
 
+        /// <summary>
+        /// Send an internal message to client
+        /// </summary>
+        /// <param name="msg"></param>
+        internal void Send(TcpMessage msg)
+        {
+            if (this.SocketSettings.SimulatedPingOutgoing > 0 && msg.SimulatedPingAdded == false)
+            {
+                msg.SetPing(this.SocketSettings.SimulatedPingOutgoing);
+                this.PendingOutgoingMessages.Enqueue(msg);
+            }
+            else
+            {
+                this.OutgoingMessages.Enqueue(msg);
+            }
+
+            this.StartSendingTask();
+        }
+
+        /// <summary>
+        /// Callback, when a client connects
+        /// </summary>
+        /// <param name="ar"></param>
         private void OnClientConnect(IAsyncResult ar)
         {
             if (this.Socket == null)
@@ -222,6 +294,9 @@ namespace GodmodeGames.Net.Transport.Tcp
             }            
         }
 
+        /// <summary>
+        /// starts the sending task, if not running
+        /// </summary>
         private void StartSendingTask()
         {
             if (this.Socket == null)
@@ -243,10 +318,56 @@ namespace GodmodeGames.Net.Transport.Tcp
                         {
                             while (this.OutgoingMessages.TryDequeue(out TcpMessage msg))
                             {
-                                byte[] data = msg.Serialize();
-                                this.Statistics.UpdateSentStatistics(data.Length);
-                                msg.Client.Statistics.UpdateSentStatistics(data.Length);
-                                ((TcpConnection)msg.Client.Transport).SendToClient(data);
+                                this.InternalSendTo(msg);
+                            }
+                        }
+
+                        //Resend pending outgoing messages
+                        if (this.Socket != null && this.PendingOutgoingMessages.Count > 0 && !this.CTS.IsCancellationRequested)
+                        {
+                            List<TcpMessage> new_pending = new List<TcpMessage>();
+                            while (this.PendingOutgoingMessages.TryDequeue(out TcpMessage resend))
+                            {
+                                if (resend.ExecuteTime <= DateTime.UtcNow)
+                                {
+                                    this.InternalSendTo(resend);
+                                }
+                                else
+                                {
+                                    new_pending.Add(resend);
+                                }
+                            }
+                            if (new_pending.Count > 0)
+                            {
+                                foreach (TcpMessage msg in new_pending)
+                                {
+                                    this.PendingOutgoingMessages.Enqueue(msg);
+                                }
+                            }
+                        }
+
+                        //Dispatch pending incomming messages
+                        if (this.Socket != null && this.PendingIncommingMessages.Count > 0 && !this.CTS.IsCancellationRequested)
+                        {
+                            List<TcpMessage> new_pending = new List<TcpMessage>();
+                            while (this.PendingIncommingMessages.TryDequeue(out TcpMessage resend))
+                            {
+                                if (resend.ExecuteTime <= DateTime.UtcNow)
+                                {
+                                    this.ProcessReceivedMessage(resend);
+                                }
+                                else
+                                {
+                                    new_pending.Add(resend);
+                                }
+                            }
+
+                            if (new_pending.Count > 0)
+                            {
+                                foreach (TcpMessage msg in new_pending)
+                                {
+                                    this.PendingIncommingMessages.Enqueue(msg);
+                                }
                             }
                         }
 
@@ -264,25 +385,84 @@ namespace GodmodeGames.Net.Transport.Tcp
             }
         }
 
+        /// <summary>
+        /// Send the internal message to the client
+        /// </summary>
+        /// <param name="msg"></param>
+        private void InternalSendTo(TcpMessage msg)
+        {
+            if (this.SocketSettings.SimulatedPingOutgoing > 0 && msg.SimulatedPingAdded == false)
+            {
+                msg.SetPing(this.SocketSettings.SimulatedPingOutgoing);
+                this.PendingOutgoingMessages.Enqueue(msg);
+                return;
+            }
+
+            if (msg.ExecuteTime > DateTime.UtcNow)
+            {
+                //don't process yet
+                return;
+            }
+
+            byte[] data = msg.Serialize();
+            this.Statistics.UpdateSentStatistics(data.Length);
+            ((TcpConnection)msg.Client.Transport).SendToClient(data);
+
+            return ;
+        }
+
+        /// <summary>
+        /// called, when a client receives data 
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="client"></param>
         internal void ClientDataReceived(byte[] data, GGConnection client)
         {
-            client.Statistics.UpdateReceiveStatistics(data.Length);
             this.Statistics.UpdateReceiveStatistics(data.Length);
 
             TcpMessage msg = new TcpMessage();
             if (msg.Deserialize(data, client))
             {
-                if (msg.MessageType == TcpMessage.EMessageType.Data)
-                {
-                    this.IncommingMessages.Enqueue(msg);
-                }
-                else
-                {
-                    this.ReceivedInternalMessage(msg, client);
-                }
+                this.ProcessReceivedMessage(msg);
             }
         }
 
+        /// <summary>
+        /// Process the received message
+        /// </summary>
+        /// <param name="msg"></param>
+        private void ProcessReceivedMessage(TcpMessage msg)
+        {
+            if (this.SocketSettings.SimulatedPingIncomming > 0 && msg.SimulatedPingAdded == false)
+            {
+                msg.SetPing(this.SocketSettings.SimulatedPingIncomming);
+                this.PendingIncommingMessages.Enqueue(msg);
+                return;
+            }
+
+            if (msg.ExecuteTime > DateTime.UtcNow)
+            {
+                //don't process yet
+                return;
+            }
+
+            if (msg.MessageType == TcpMessage.EMessageType.Data)
+            {
+                this.IncommingMessages.Enqueue(msg);
+            }
+            else
+            {
+                this.ReceivedInternalMessage(msg, msg.Client);
+            }
+
+            return;
+        }
+
+        /// <summary>
+        /// Process an internal message
+        /// </summary>
+        /// <param name="msg"></param>
+        /// <param name="client"></param>
         private void ReceivedInternalMessage(TcpMessage msg, GGConnection client)
         {
             if (msg.MessageType == TcpMessage.EMessageType.Disconnect)
@@ -296,13 +476,13 @@ namespace GodmodeGames.Net.Transport.Tcp
                 //client send heartbeat 
                 if (msg.Data.Length >= 4)
                 {
-                    TcpMessage pong = new TcpMessage
+                    TcpMessage pong = new TcpMessage()
                     {
                         Data = msg.Data,
                         Client = client,
                         MessageType = EMessageType.HeartbeatPong
                     };
-                    this.OutgoingMessages.Enqueue(pong);
+                    this.InternalSendTo(pong);
                 }
             }
             else if (msg.MessageType == EMessageType.HeartbeatPong)
@@ -315,6 +495,11 @@ namespace GodmodeGames.Net.Transport.Tcp
             }
         }
 
+        /// <summary>
+        /// Remove client from Connections-List and invoke ClientDisconnected-event
+        /// </summary>
+        /// <param name="client"></param>
+        /// <param name="reason"></param>
         internal void RemoveClient(GGConnection client, string reason)
         {
             if (this.Connections.TryRemove(client.ClientEndpoint, out _))
@@ -336,6 +521,9 @@ namespace GodmodeGames.Net.Transport.Tcp
         {
             //Empty Queue
             this.OutgoingMessages.Clear();
+            this.IncommingMessages.Clear();
+            this.PendingIncommingMessages.Clear();
+            this.PendingOutgoingMessages.Clear();
             this.Connections.Clear();
 
             try

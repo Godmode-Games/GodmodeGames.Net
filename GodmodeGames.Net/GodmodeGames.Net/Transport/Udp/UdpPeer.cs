@@ -40,6 +40,22 @@ namespace GodmodeGames.Net.Transport.Udp
         /// reliablie ID counter
         /// </summary>
         protected int NextReliableMessageId = 1;
+        /// <summary>
+        /// Messages that should be send with a simulated ping
+        /// </summary>
+        protected ConcurrentQueue<UdpMessage> PendingOutgoingMessages = new ConcurrentQueue<UdpMessage>();
+        /// <summary>
+        /// Messages that should be received with a simulated ping
+        /// </summary>
+        protected ConcurrentQueue<UdpMessage> PendingIncommingMessages = new ConcurrentQueue<UdpMessage>();
+
+        protected abstract void UpdateStatisticsReceive(int bytes, IPEndPoint endpoint);
+        protected abstract void UpdateStatisticsSent(int bytes, IPEndPoint endpoint);
+        protected abstract void UpdatePacketLost(IPEndPoint endpoint);
+        protected abstract void PacketLost(AckMessage message);
+        protected abstract void ConnectionFailed(IPEndPoint endpoint);
+        protected abstract void ReceivedInternalMessage(UdpMessage msg);
+        protected abstract void ReceivedInternalACK(AckMessage msg);
 
         /// <summary>
         /// Inititalize the socket
@@ -58,6 +74,12 @@ namespace GodmodeGames.Net.Transport.Udp
             };
 
             this.CTS = new CancellationTokenSource();
+
+            this.IncommingMessages.Clear();
+            this.OutgoingMessages.Clear();
+            this.PendingIncommingMessages.Clear();
+            this.PendingOutgoingMessages.Clear();
+            this.PendingUnacknowledgedMessages.Clear();
         }
 
         /// <summary>
@@ -67,16 +89,16 @@ namespace GodmodeGames.Net.Transport.Udp
         protected virtual void Send(UdpMessage msg)
         {
             this.StartSendingTask();
-            this.OutgoingMessages.Enqueue(msg);
+            if (this.SocketSettings.SimulatedPingOutgoing > 0 && msg.SimulatedPingAdded == false)
+            {
+                msg.SetPing(this.SocketSettings.SimulatedPingOutgoing);
+                this.PendingOutgoingMessages.Enqueue(msg);
+            }
+            else
+            {
+                this.OutgoingMessages.Enqueue(msg);
+            }
         }
-
-        protected abstract void UpdateStatisticsReceive(int bytes, IPEndPoint endpoint);
-        protected abstract void UpdateStatisticsSent(int bytes, IPEndPoint endpoint);
-        protected abstract void UpdatePacketLost(IPEndPoint endpoint);
-        protected abstract void PacketLost(AckMessage message);
-        protected abstract void ConnectionFailed(IPEndPoint endpoint);
-        protected abstract void ReceivedInternalMessage(UdpMessage msg);
-        protected abstract void ReceivedInternalACK(AckMessage msg);
 
         /// <summary>
         /// start the receiving task, if not running
@@ -121,51 +143,10 @@ namespace GodmodeGames.Net.Transport.Udp
                         {
                             this.UpdateStatisticsReceive(numOfReceivedBytes, (IPEndPoint)endPoint);
 
-                            if (this.SocketSettings.SimulatedUdpPacketLostReceive > 0)
-                            {
-                                //simulate packet lost
-                                int percent = new Random().Next(0, 101);
-                                int packetlost = Math.Clamp(this.SocketSettings.SimulatedUdpPacketLostReceive, 0, 100);
-                                if (percent < packetlost)
-                                {
-                                    this.Logger?.LogWarning("Simulate receive Packetlost...");
-                                    continue;
-                                }
-                            }
-
                             UdpMessage msg = new UdpMessage();
                             if (msg.Deserialize(data.Take(numOfReceivedBytes).ToArray(), (IPEndPoint)endPoint))
                             {
-                                if (msg.MessageType == EMessageType.Ack)
-                                {
-                                    if (this.PendingUnacknowledgedMessages.TryRemove(msg.MessageId, out AckMessage ack))
-                                    {
-                                        this.ReceivedInternalACK(ack);
-                                    }
-                                }
-                                else
-                                {
-                                    if (msg.MessageId >= 0)
-                                    {
-                                        //send ack for reliable message back...
-                                        UdpMessage ack = new UdpMessage
-                                        {
-                                            MessageType = EMessageType.Ack,
-                                            MessageId = msg.MessageId,
-                                            RemoteEndpoint = msg.RemoteEndpoint
-                                        };
-                                        this.InternalSendTo(ack);
-                                    }
-
-                                    if (msg.MessageType != EMessageType.Data)
-                                    {
-                                        this.ReceivedInternalMessage(msg);
-                                    }
-                                    else
-                                    {
-                                        this.IncommingMessages.Enqueue(msg);
-                                    }                                    
-                                }                                
+                                this.ProcessReceivedMessage(msg);
                             }
                             else
                             {
@@ -231,6 +212,55 @@ namespace GodmodeGames.Net.Transport.Udp
                             }
                         }
 
+                        //Resend pending outgoing messages
+                        if (this.Socket != null && this.PendingOutgoingMessages.Count > 0 && !this.CTS.IsCancellationRequested)
+                        {
+                            List<UdpMessage> new_pending = new List<UdpMessage>();
+                            while (this.PendingOutgoingMessages.TryDequeue(out UdpMessage resend))
+                            {
+                                if (resend.ExecuteTime <= DateTime.UtcNow)
+                                {
+                                    this.InternalSendTo(resend);
+                                }
+                                else
+                                {
+                                    new_pending.Add(resend);
+                                }
+                            }
+                            if (new_pending.Count > 0)
+                            {
+                                foreach (UdpMessage msg in new_pending)
+                                {
+                                    this.PendingOutgoingMessages.Enqueue(msg);
+                                }
+                            }
+                        }
+
+                        //Dispatch pending incomming messages
+                        if (this.Socket != null && this.PendingIncommingMessages.Count > 0 && !this.CTS.IsCancellationRequested)
+                        {
+                            List<UdpMessage> new_pending = new List<UdpMessage>();
+                            while (this.PendingIncommingMessages.TryDequeue(out UdpMessage resend))
+                            {
+                                if (resend.ExecuteTime <= DateTime.UtcNow)
+                                {
+                                    this.ProcessReceivedMessage(resend);                                    
+                                }
+                                else
+                                {
+                                    new_pending.Add(resend);
+                                }
+                            }
+
+                            if (new_pending.Count > 0)
+                            {
+                                foreach (UdpMessage msg in new_pending)
+                                {
+                                    this.PendingIncommingMessages.Enqueue(msg);
+                                }
+                            }
+                        }
+
                         // if nothing to do, take a short break.
                         stopwatch.Stop();
 
@@ -245,13 +275,80 @@ namespace GodmodeGames.Net.Transport.Udp
             }
         }
 
-        protected void InternalSendTo(UdpMessage msg)
+        /// <summary>
+        /// Handle incomming message, Simulate packet lost and ping
+        /// </summary>
+        /// <param name="msg"></param>
+        /// <returns></returns>
+        private void ProcessReceivedMessage(UdpMessage msg)
         {
-            if (this.SocketSettings.SimulatedUdpPacketLostSend > 0)
+            if (this.SocketSettings.SimulatedUdpPacketLostIncomming > 0)
             {
                 //simulate packet lost
                 int percent = new Random().Next(0, 101);
-                int packetlost = Math.Clamp(this.SocketSettings.SimulatedUdpPacketLostSend, 0, 100);
+                int packetlost = Math.Clamp(this.SocketSettings.SimulatedUdpPacketLostIncomming, 0, 100);
+                if (percent < packetlost)
+                {
+                    this.Logger?.LogWarning("Simulate receive packet-lost...");
+                    return;
+                }
+            }
+
+            if (this.SocketSettings.SimulatedPingIncomming > 0 && msg.SimulatedPingAdded == false)
+            {
+                msg.SetPing(this.SocketSettings.SimulatedPingIncomming);
+                this.PendingIncommingMessages.Enqueue(msg);
+                return;
+            }
+
+            if (msg.ExecuteTime > DateTime.UtcNow)
+            {
+                //don't process yet
+                return;
+            }
+
+            if (msg.MessageType == EMessageType.Ack)
+            {
+                if (this.PendingUnacknowledgedMessages.TryRemove(msg.MessageId, out AckMessage ack))
+                {
+                    this.ReceivedInternalACK(ack);
+                }
+            }
+            else
+            {
+                if (msg.MessageId >= 0)
+                {
+                    //send ack for reliable message back...
+                    UdpMessage ack = new UdpMessage()
+                    {
+                        MessageType = EMessageType.Ack,
+                        MessageId = msg.MessageId,
+                        RemoteEndpoint = msg.RemoteEndpoint,
+                    };
+
+                    this.InternalSendTo(ack);
+                }
+
+                if (msg.MessageType != EMessageType.Data)
+                {
+                    this.ReceivedInternalMessage(msg);
+                }
+                else
+                {
+                    this.IncommingMessages.Enqueue(msg);
+                }
+            }
+
+            return;
+        }
+
+        protected void InternalSendTo(UdpMessage msg)
+        {
+            if (this.SocketSettings.SimulatedUdpPacketLostOutgoing > 0)
+            {
+                //simulate packet lost
+                int percent = new Random().Next(0, 101);
+                int packetlost = Math.Clamp(this.SocketSettings.SimulatedUdpPacketLostOutgoing, 0, 100);
                 if (percent < packetlost)
                 {
                     this.Logger?.LogWarning("Simulate send packet-lost...");
@@ -266,24 +363,17 @@ namespace GodmodeGames.Net.Transport.Udp
                 }
             }
 
-            if (this.SocketSettings.SimulatedPing > 0)
+            if (this.SocketSettings.SimulatedPingOutgoing > 0 && msg.SimulatedPingAdded == false)
             {
-                //Simulate ping, re-queue the packet until it should be send
-                if (msg.AddedSimulatedPing == false)
-                {
-                    msg.ProcessTime = DateTime.UtcNow.AddMilliseconds(this.SocketSettings.SimulatedPing);
-                    msg.AddedSimulatedPing = true;
-                    this.OutgoingMessages.Enqueue(msg);
-                    return;
-                }
-                else
-                {
-                    if (msg.ProcessTime > DateTime.UtcNow)
-                    {
-                        this.OutgoingMessages.Enqueue(msg);
-                        return;
-                    }
-                }
+                msg.SetPing(this.SocketSettings.SimulatedPingOutgoing);
+                this.PendingOutgoingMessages.Enqueue(msg);
+                return;
+            }
+
+            if (msg.ExecuteTime > DateTime.UtcNow)
+            {
+                //don't process yet
+                return;
             }
 
             byte[] data;
@@ -326,6 +416,8 @@ namespace GodmodeGames.Net.Transport.Udp
                 AckMessage ack = new AckMessage(msg);
                 this.PendingUnacknowledgedMessages.TryAdd(msg.MessageId, ack);
             }
+
+            return;
         }
 
         /// <summary>

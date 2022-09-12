@@ -12,7 +12,7 @@ namespace GodmodeGames.Net.SampleClient
         static GGClient Client = null;
         static async Task Main(string[] args)
         {
-            Client = new GGClient(new ClientSocketSettings { Transport = SocketSettings.ETransport.Tcp }, new ConsoleLogger());
+            Client = new GGClient(new ClientSocketSettings { Transport = SocketSettings.ETransport.Udp }, new ConsoleLogger());
             Client.ReceivedData += OnData;
             Client.Disconnected += OnDisconnect;
 

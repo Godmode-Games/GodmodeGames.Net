@@ -13,11 +13,6 @@ namespace GodmodeGames.Net.Transport.Udp
         /// </summary>
         public int RetryTimes = 0;
 
-        public AckMessage()
-        {
-
-        }
-
         public AckMessage(UdpMessage msg) : base(msg.Data, msg.MessageId, msg.RemoteEndpoint, msg.MessageType)
         {
             this.LastTryTime = DateTime.UtcNow;

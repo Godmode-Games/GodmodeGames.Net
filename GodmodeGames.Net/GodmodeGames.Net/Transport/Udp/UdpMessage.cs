@@ -5,30 +5,26 @@ using System.Net;
 
 namespace GodmodeGames.Net.Transport.Udp
 {
-    internal class UdpMessage
+    internal class UdpMessage : Message
     {
         internal enum EMessageType : byte { Data = 1, Ack = 2, DiscoverRequest = 3, DiscoverResponse = 4, Disconnect = 5, HeartBeat = 6 }
         internal EMessageType MessageType = EMessageType.Data;
 
-        internal byte[] Data = new byte[0];
         internal int MessageId = -1;// -1 means notreliable
         internal IPEndPoint RemoteEndpoint;
 
-        //Ping Simulation...
-        internal DateTime ProcessTime = DateTime.UtcNow;
-        internal bool AddedSimulatedPing = false;
-
         internal UdpMessage()
         {
-
+            this.SetPing(0);
         }
 
         internal UdpMessage(byte[] data, int messageid, IPEndPoint endpoint, EMessageType type)
-        {
+        { 
             Data = data;
             MessageId = messageid;
             MessageType = type;
             RemoteEndpoint = endpoint;
+            this.SetPing(0);
         }
 
         /// <summary>
@@ -64,7 +60,7 @@ namespace GodmodeGames.Net.Transport.Udp
         /// returns the byte-array of the message
         /// </summary>
         /// <returns></returns>
-        internal byte[] Serialize()
+        internal override byte[] Serialize()
         {
             List<byte> ret = new List<byte>();
             ret.Add((byte)this.MessageType);

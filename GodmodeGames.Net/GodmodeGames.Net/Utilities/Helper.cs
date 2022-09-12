@@ -4,6 +4,11 @@ namespace GodmodeGames.Net.Utilities
 {
     internal class Helper
     {
+        /// <summary>
+        /// Generates string from byte-array
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
         internal static string BytesToString(byte[] data)
         {
             if (data.Length == 0)

@@ -39,6 +39,9 @@ namespace GodmodeGames.Net.Transport.Udp
         /// </summary>
         private Stopwatch HeartbeatStopwatch = new Stopwatch();
 
+        /// <summary>
+        /// Round Trip Time (Ping)
+        /// </summary>
         public int RTT { get; set; } = -1;
 
         #region Events
@@ -60,7 +63,7 @@ namespace GodmodeGames.Net.Transport.Udp
         }
 
         /// <summary>
-        /// Connect asynchronous to server
+        /// Connect asynchronous to server, check the ConnectAttempt-Event for result
         /// </summary>
         /// <param name="endpoint"></param>
         public void ConnectAsync(IPEndPoint endpoint)
@@ -69,7 +72,7 @@ namespace GodmodeGames.Net.Transport.Udp
 
             this.ConnectionStatus = EConnectionStatus.Connecting;
 
-            UdpMessage discover = new UdpMessage
+            UdpMessage discover = new UdpMessage()
             {
                 MessageType = EMessageType.DiscoverRequest,
                 MessageId = this.GetNextReliableId(),
@@ -185,7 +188,7 @@ namespace GodmodeGames.Net.Transport.Udp
 
                 if (this.LastHeartbeat.AddMilliseconds(this.SocketSettings.HeartbeatInterval) < DateTime.UtcNow)
                 {
-                    UdpMessage msg = new UdpMessage
+                    UdpMessage msg = new UdpMessage()
                     {
                         MessageType = EMessageType.HeartBeat,
                         MessageId = this.GetNextReliableId(),
@@ -217,6 +220,8 @@ namespace GodmodeGames.Net.Transport.Udp
             this.OutgoingMessages.Clear();
             this.PendingUnacknowledgedMessages.Clear();
             this.ReceivedMessagesBuffer.Clear();
+            this.PendingIncommingMessages.Clear();
+            this.PendingOutgoingMessages.Clear();
 
             try
             {
@@ -276,7 +281,7 @@ namespace GodmodeGames.Net.Transport.Udp
                 data = Encoding.UTF8.GetBytes(reason);
             }
 
-            UdpMessage disc = new UdpMessage
+            UdpMessage disc = new UdpMessage()
             {
                 MessageType = EMessageType.Disconnect,
                 MessageId = this.GetNextReliableId(),                

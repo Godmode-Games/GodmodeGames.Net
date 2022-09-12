@@ -4,7 +4,13 @@ namespace GodmodeGames.Net.Transport.Udp
 {
     internal class UdpConnection : IConnectionTransport
     {
+        /// <summary>
+        /// Message-Ids for already received messages
+        /// </summary>
         public List<int> ReceivedMessagesBuffer = new List<int>();
+        /// <summary>
+        /// Connection-Object
+        /// </summary>
         public GGConnection Connection { get; set; }
 
         public UdpConnection(GGConnection connection)
