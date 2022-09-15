@@ -48,7 +48,7 @@ namespace GodmodeGames.Net
         /// </summary>
         public int Ping = -1;
 
-        internal GGConnection(IServerTransport servertransport, ServerSocketSettings settings, ILogger logger, IPEndPoint endpoint)
+        public GGConnection(IServerTransport servertransport, ServerSocketSettings settings, ILogger logger, IPEndPoint endpoint)
         {
             this.ServerTransport = servertransport;
             this.Settings = settings;
