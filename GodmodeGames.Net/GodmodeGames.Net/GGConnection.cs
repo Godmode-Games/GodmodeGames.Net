@@ -44,9 +44,14 @@ namespace GodmodeGames.Net
         /// stopwatch to calcualte rtt
         /// </summary>
         private Stopwatch HeartbeatStopwatch = new Stopwatch();
+        /// <summary>
         /// Current Ping of the client
         /// </summary>
         public int Ping = -1;
+        /// <summary>
+        /// Additional data for the client
+        /// </summary>
+        public object ClientData = null;
 
         public GGConnection(IServerTransport servertransport, ServerSocketSettings settings, ILogger logger, IPEndPoint endpoint)
         {
@@ -84,6 +89,11 @@ namespace GodmodeGames.Net
         public void Send(byte[] data, bool reliable)
         {
             this.ServerTransport.Send(data, this, reliable);
+        }
+
+        public void Disconnect(string reason)
+        {
+            this.Transport.Disconnect(reason);
         }
 
         internal void StartHeartbeat(int messageid)
