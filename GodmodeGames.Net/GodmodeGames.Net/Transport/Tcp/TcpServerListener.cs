@@ -448,7 +448,14 @@ namespace GodmodeGames.Net.Transport.Tcp
 
             if (msg.MessageType == TcpMessage.EMessageType.Data)
             {
-                this.IncommingMessages.Enqueue(msg);
+                if (this.SocketSettings.InvokeReceiveDataEventOnTick == false)
+                {
+                    this.ReceivedData?.Invoke(msg.Data, msg.Client);
+                }
+                else
+                {
+                    this.IncommingMessages.Enqueue(msg);
+                }
             }
             else
             {

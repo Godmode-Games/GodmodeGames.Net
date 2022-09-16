@@ -21,6 +21,10 @@
         /// </summary>
         public int SendBufferSize = 1024 * 1024;
         /// <summary>
+        /// Should the ReceivedData event be invoked immediately or in Tick()-Method
+        /// </summary>
+        public bool InvokeReceiveDataEventOnTick = true;
+        /// <summary>
         /// Heartbeat interval in milliseconds
         /// </summary>
         public int HeartbeatInterval = 5000;
@@ -61,11 +65,11 @@
         /// <summary>
         /// when to resend a message, if no ack has arrived
         /// </summary>
-        public ushort UdpReliableResendTime = 500;
+        public ushort UdpReliableResendTime = 250;
         /// <summary>
         /// how often will the message be resend, before giving it up
         /// </summary>
-        public int UdpResendTries = 10;
+        public int UdpResendTries = 20;
         /// <summary>
         /// Buffer the last messages, to avoid dublicate receive
         /// </summary>

@@ -301,24 +301,33 @@ namespace GodmodeGames.Net.Transport.Udp
             {
                 while (this.IncommingMessages.TryDequeue(out UdpMessage msg))
                 {
-                    if (this.ReceivedMessagesBuffer.Contains(msg.MessageId))
-                    {
-                        this.Logger?.LogInfo("Skipping already received message.");
-                        continue;
-                    }
-                    else
-                    {
-                        this.ReceivedMessagesBuffer.Add(msg.MessageId);
-                        if (this.ReceivedMessagesBuffer.Count > this.SocketSettings.UdpDublicateMessagesBuffer)
-                        {
-                            this.ReceivedMessagesBuffer.RemoveAt(0);
-                        }
-                    }
-
-                    //Data message
-                    this.ReceivedData?.Invoke(msg.Data);
+                    this.DispatchMessage(msg);
                 }
             }
+        }
+
+        /// <summary>
+        /// Handle a message instantly, if ServerSocketSettings.InvokeReceiveDataEventOnTick == false
+        /// </summary>
+        /// <param name="msg"></param>
+        protected override void DispatchMessage(UdpMessage msg)
+        {
+            if (this.ReceivedMessagesBuffer.Contains(msg.MessageId))
+            {
+                this.Logger?.LogInfo("Skipping already received message.");
+                return;
+            }
+            else
+            {
+                this.ReceivedMessagesBuffer.Add(msg.MessageId);
+                if (this.ReceivedMessagesBuffer.Count > this.SocketSettings.UdpDublicateMessagesBuffer)
+                {
+                    this.ReceivedMessagesBuffer.RemoveAt(0);
+                }
+            }
+
+            //Data message
+            this.ReceivedData?.Invoke(msg.Data);
         }
 
         /// <summary>

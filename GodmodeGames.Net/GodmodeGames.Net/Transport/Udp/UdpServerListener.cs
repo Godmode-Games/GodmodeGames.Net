@@ -292,31 +292,40 @@ namespace GodmodeGames.Net.Transport.Udp
             {
                 while (this.IncommingMessages.TryDequeue(out UdpMessage msg))
                 {
-                    GGConnection client;
-                    if (!this.Connections.TryGetValue(msg.RemoteEndpoint, out client))
-                    {
-                        this.Logger?.LogWarning("Skipping message from unknown receiver " + msg.RemoteEndpoint);
-                        continue;
-                    }
-
-                    UdpConnection conn = client.Transport as UdpConnection;
-                    if (conn.ReceivedMessagesBuffer.Contains(msg.MessageId))
-                    {
-                        //this.Logger?.LogInfo("Skipping already received message.");
-                        continue;
-                    }
-                    else
-                    {
-                        conn.ReceivedMessagesBuffer.Add(msg.MessageId);
-                        if (conn.ReceivedMessagesBuffer.Count > this.SocketSettings.UdpDublicateMessagesBuffer)
-                        {
-                            conn.ReceivedMessagesBuffer.RemoveAt(0);
-                        }
-                    }
-
-                    this.ReceivedData?.Invoke(msg.Data, client);
+                    this.DispatchMessage(msg);
                 }
             }
+        }
+
+        /// <summary>
+        /// Handle a message instantly, if ServerSocketSettings.InvokeReceiveDataEventOnTick == false
+        /// </summary>
+        /// <param name="msg"></param>
+        protected override void DispatchMessage(UdpMessage msg)
+        {
+            GGConnection client;
+            if (!this.Connections.TryGetValue(msg.RemoteEndpoint, out client))
+            {
+                this.Logger?.LogWarning("Skipping message from unknown receiver " + msg.RemoteEndpoint);
+                return;
+            }
+
+            UdpConnection conn = client.Transport as UdpConnection;
+            if (conn.ReceivedMessagesBuffer.Contains(msg.MessageId))
+            {
+                //this.Logger?.LogInfo("Skipping already received message.");
+                return;
+            }
+            else
+            {
+                conn.ReceivedMessagesBuffer.Add(msg.MessageId);
+                if (conn.ReceivedMessagesBuffer.Count > this.SocketSettings.UdpDublicateMessagesBuffer)
+                {
+                    conn.ReceivedMessagesBuffer.RemoveAt(0);
+                }
+            }
+
+            this.ReceivedData?.Invoke(msg.Data, client);
         }
 
         /// <summary>

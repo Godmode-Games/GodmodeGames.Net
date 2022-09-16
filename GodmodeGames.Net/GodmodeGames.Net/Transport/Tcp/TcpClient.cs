@@ -664,7 +664,15 @@ namespace GodmodeGames.Net.Transport.Tcp
 
             if (msg.MessageType == EMessageType.Data)
             {
-                this.IncommingMessages.Enqueue(msg);
+                if (this.SocketSettings.InvokeReceiveDataEventOnTick == false)
+                {
+                    //Instant invoke
+                    this.ReceivedData?.Invoke(msg.Data);
+                }
+                else
+                {
+                    this.IncommingMessages.Enqueue(msg);
+                }
             }
             else
             {

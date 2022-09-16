@@ -55,6 +55,7 @@ namespace GodmodeGames.Net.Transport.Udp
         protected abstract void PacketLost(AckMessage message);
         protected abstract void ConnectionFailed(IPEndPoint endpoint);
         protected abstract void ReceivedInternalMessage(UdpMessage msg);
+        protected abstract void DispatchMessage(UdpMessage msg);
         protected abstract void ReceivedInternalACK(AckMessage msg);
 
         /// <summary>
@@ -335,7 +336,14 @@ namespace GodmodeGames.Net.Transport.Udp
                 }
                 else
                 {
-                    this.IncommingMessages.Enqueue(msg);
+                    if (this.SocketSettings.InvokeReceiveDataEventOnTick == false)
+                    {
+                        this.DispatchMessage(msg);
+                    }
+                    else
+                    {
+                        this.IncommingMessages.Enqueue(msg);
+                    }
                 }
             }
 
