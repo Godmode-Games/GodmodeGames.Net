@@ -93,6 +93,17 @@ namespace GodmodeGames.Net.Transport.Udp
                     this.DisconnectClient(kvp.Value, reason);
                 }
             }
+            else
+            {
+                this.ListeningStatus = EListeningStatus.Shutdown;
+                this.TickEvents.Enqueue(new TickEvent
+                {
+                    OnTick = () =>
+                    {
+                        this.ShutdownCompleted?.Invoke();
+                    }
+                });
+            }
         }
 
         /// <summary>
@@ -444,7 +455,13 @@ namespace GodmodeGames.Net.Transport.Udp
             if (this.ListeningStatus == EListeningStatus.ShuttingDown && this.Connections.Count == 0)
             {
                 this.ListeningStatus = EListeningStatus.Shutdown;
-                this.ShutdownCompleted?.Invoke();
+                this.TickEvents.Enqueue(new TickEvent
+                {
+                    OnTick = () =>
+                    {
+                        this.ShutdownCompleted?.Invoke();
+                    }
+                });
             }
         }
 
