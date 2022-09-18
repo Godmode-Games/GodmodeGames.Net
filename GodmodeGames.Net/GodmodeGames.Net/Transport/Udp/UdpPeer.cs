@@ -90,6 +90,8 @@ namespace GodmodeGames.Net.Transport.Udp
         protected virtual void Send(UdpMessage msg)
         {
             this.StartSendingTask();
+            this.StartReceivingTask();
+
             if (this.SocketSettings.SimulatedPingOutgoing > 0 && msg.SimulatedPingAdded == false)
             {
                 msg.SetPing(this.SocketSettings.SimulatedPingOutgoing);
