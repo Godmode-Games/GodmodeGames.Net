@@ -2,6 +2,8 @@
 using GodmodeGames.Net.Settings;
 using GodmodeGames.Net.Transport;
 using GodmodeGames.Net.Transport.Statistics;
+using System;
+using System.Linq;
 using System.Net;
 using static GodmodeGames.Net.Transport.IClientTransport;
 
@@ -76,7 +78,11 @@ namespace GodmodeGames.Net
         /// <returns></returns>
         public bool Connect(string host, int port)
         {
-            IPEndPoint endpoint = new IPEndPoint(IPAddress.Parse(host), port);
+            IPEndPoint endpoint = this.ParseHost(host, port);
+            if (endpoint == null)
+            {
+                return false;
+            }
             return this.Connect(endpoint);
         }
 
@@ -100,7 +106,12 @@ namespace GodmodeGames.Net
         /// <param name="port"></param>
         public void ConnectAsync(string host, int port)
         {
-            IPEndPoint endpoint = new IPEndPoint(IPAddress.Parse(host), port);
+            IPEndPoint endpoint = this.ParseHost(host, port);
+            if (endpoint == null)
+            {
+                this.ConnectAttempt?.Invoke(false);
+                return;
+            }
             this.ConnectAsync(endpoint);
         }
 
@@ -202,6 +213,28 @@ namespace GodmodeGames.Net
         private void OnTransportDisconnect(EDisconnectBy disconnect_by, string reason = null)
         {
             this.Disconnected?.Invoke(disconnect_by, reason);
+        }
+
+        /// <summary>
+        /// Parses a host to ipaddress
+        /// </summary>
+        /// <param name="host"></param>
+        /// <param name="port"></param>
+        /// <returns></returns>
+        private IPEndPoint ParseHost(string host, int port)
+        {
+            var addresses = System.Net.Dns.GetHostAddresses(host);
+            if (addresses.Length == 0)
+            {
+                return null;
+            }
+
+            foreach (IPAddress address in addresses.Where(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork))
+            {
+                return new IPEndPoint(address, port);
+            }
+
+            return null;
         }
     }
 }

@@ -58,6 +58,7 @@ namespace GodmodeGames.Net.Transport.Udp
         public void Inititalize(ClientSocketSettings settings, ILogger logger)
         {
             base.Initialize((SocketSettings)settings, logger);
+
             this.ConnectionStatus = EConnectionStatus.NotConnected;
             this.NextTickCheck = DateTime.UtcNow;
         }
@@ -79,6 +80,8 @@ namespace GodmodeGames.Net.Transport.Udp
                 Data = new byte[0],
                 RemoteEndpoint = this.RemoteEndpoint
             };
+
+            this.CTS = new CancellationTokenSource();
 
             this.Send(discover);
         }
@@ -186,20 +189,23 @@ namespace GodmodeGames.Net.Transport.Udp
             {
                 this.NextTickCheck = DateTime.UtcNow.AddMilliseconds(this.SocketSettings.TickCheckRate);
 
-                if (this.LastHeartbeat.AddMilliseconds(this.SocketSettings.HeartbeatInterval) < DateTime.UtcNow)
+                if (this.ConnectionStatus == EConnectionStatus.Connected)
                 {
-                    UdpMessage msg = new UdpMessage()
+                    if (this.LastHeartbeat.AddMilliseconds(this.SocketSettings.HeartbeatInterval) < DateTime.UtcNow)
                     {
-                        MessageType = EMessageType.HeartBeat,
-                        MessageId = this.GetNextReliableId(),
-                        Data = new byte[0],
-                        RemoteEndpoint = this.RemoteEndpoint
-                    };
-                    this.LastHeartbeatId = msg.MessageId;
-                    this.LastHeartbeat = DateTime.UtcNow;
-                    this.HeartbeatStopwatch.Restart();
+                        UdpMessage msg = new UdpMessage()
+                        {
+                            MessageType = EMessageType.HeartBeat,
+                            MessageId = this.GetNextReliableId(),
+                            Data = new byte[0],
+                            RemoteEndpoint = this.RemoteEndpoint
+                        };
+                        this.LastHeartbeatId = msg.MessageId;
+                        this.LastHeartbeat = DateTime.UtcNow;
+                        this.HeartbeatStopwatch.Restart();
 
-                    this.Send(msg);
+                        this.Send(msg);
+                    }
                 }
 
                 //check timeout
@@ -228,8 +234,8 @@ namespace GodmodeGames.Net.Transport.Udp
                 this.CTS.Cancel();
                 this.SendTask?.Wait(500);
                 this.ReceiveTask?.Wait(500);
-                this.Socket?.Close();
-                this.Socket = null;
+                /*this.Socket?.Close();
+                this.Socket = null;*/
             }
             catch (Exception)
             {

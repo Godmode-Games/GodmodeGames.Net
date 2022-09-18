@@ -48,6 +48,7 @@ namespace GodmodeGames.Net.Transport.Udp
         /// <param name="endpoint"></param>
         public void StartListening(IPEndPoint endpoint)
         {
+            this.CTS = new CancellationTokenSource();
             this.RemoteEndpoint = endpoint;
             this.Socket.Bind(endpoint);
             this.StartReceivingTask();

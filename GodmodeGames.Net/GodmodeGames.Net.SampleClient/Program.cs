@@ -1,5 +1,5 @@
 ﻿//#define GG_SYNCHRONUS //synchronous or asynchronous connect
-//#define GG_CLIENT_DISCONNECT //should the client disconnect after 5 seconds?
+#define GG_CLIENT_DISCONNECT //should the client disconnect after 5 seconds?
 
 using GodmodeGames.Net.Logging;
 using GodmodeGames.Net.Settings;
