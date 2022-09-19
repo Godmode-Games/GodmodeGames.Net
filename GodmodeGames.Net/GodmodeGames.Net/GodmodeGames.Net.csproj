@@ -5,6 +5,7 @@
     <Nullable>disable</Nullable>
     <IsPublishable>False</IsPublishable>
     <RootNamespace>GodmodeGames.Net</RootNamespace>
+    <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
   </PropertyGroup>
 
 </Project>

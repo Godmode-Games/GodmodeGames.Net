@@ -157,7 +157,7 @@ namespace GodmodeGames.Net
                 return true;
             }
             this.Logger?.LogInfo("Disconnecting from " + this.ServerEndpoint.ToString() + " ...");
-            this.Transport.ReceivedData -= this.OnReceiveData;
+
             return this.Transport.Disconnect(reason);
         }
 
@@ -173,7 +173,7 @@ namespace GodmodeGames.Net
                 return;
             }
             this.Logger?.LogInfo("Disconnecting from " + this.ServerEndpoint.ToString() + " ...");
-            this.Transport.ReceivedData -= this.OnReceiveData;
+
             this.Transport.DisconnectAsync(reason);
         }
 
