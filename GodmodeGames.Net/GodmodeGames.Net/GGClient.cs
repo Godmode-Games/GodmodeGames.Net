@@ -2,7 +2,6 @@
 using GodmodeGames.Net.Settings;
 using GodmodeGames.Net.Transport;
 using GodmodeGames.Net.Transport.Statistics;
-using System;
 using System.Linq;
 using System.Net;
 using static GodmodeGames.Net.Transport.IClientTransport;
@@ -93,6 +92,15 @@ namespace GodmodeGames.Net
         /// <returns></returns>
         public bool Connect(IPEndPoint server)
         {
+            if (server == this.ServerEndpoint && this.IsConnected)
+            {
+                return true;
+            }
+            else if (this.IsConnected)
+            {
+                this.Disconnect();
+            }
+
             this.ServerEndpoint = server;
             this.Logger?.LogInfo("Connecting to " + this.ServerEndpoint.ToString() + " ...");
             this.Transport.ConnectAttempt += this.OnTransportConnect;
@@ -121,6 +129,16 @@ namespace GodmodeGames.Net
         /// <param name="server"></param>
         public void ConnectAsync(IPEndPoint server)
         {
+            if (this.IsConnected && this.ServerEndpoint == server)
+            {
+                this.ConnectAttempt?.Invoke(true);
+                return;
+            }
+            else if (this.IsConnected)
+            {
+                this.Disconnect();
+            }
+
             this.ServerEndpoint = server;
             this.Logger?.LogInfo("Connecting to " + this.ServerEndpoint.ToString() + " ...");
             this.Transport.ConnectAttempt += this.OnTransportConnect;
@@ -134,6 +152,10 @@ namespace GodmodeGames.Net
         /// <returns></returns>
         public bool Disconnect(string reason = null)
         {
+            if (!this.IsConnected)
+            {
+                return true;
+            }
             this.Logger?.LogInfo("Disconnecting from " + this.ServerEndpoint.ToString() + " ...");
             this.Transport.ReceivedData -= this.OnReceiveData;
             return this.Transport.Disconnect(reason);
@@ -145,6 +167,11 @@ namespace GodmodeGames.Net
         /// <param name="reason"></param>
         public void DisconnectAsync(string reason = null)
         {
+            if (!this.IsConnected)
+            {
+                this.Disconnected?.Invoke(EDisconnectBy.Client, reason);
+                return;
+            }
             this.Logger?.LogInfo("Disconnecting from " + this.ServerEndpoint.ToString() + " ...");
             this.Transport.ReceivedData -= this.OnReceiveData;
             this.Transport.DisconnectAsync(reason);
