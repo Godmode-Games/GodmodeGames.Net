@@ -132,12 +132,12 @@ namespace GodmodeGames.Net.Transport.Udp
                                 this.ConnectionFailed((IPEndPoint)endPoint);
                                 continue;
                             }
-                            this.Logger?.LogError("Error while receiving data: (" + ex.ErrorCode + ") " + ex.Message);
+                            this.Logger?.GGLogError("Error while receiving data: (" + ex.ErrorCode + ") " + ex.Message);
                             continue;
                         }
                         catch (Exception ex)
                         {
-                            this.Logger?.LogError("Error while receiving data: " + ex.Message);
+                            this.Logger?.GGLogError("Error while receiving data: " + ex.Message);
                             continue;
                         }
 
@@ -152,7 +152,7 @@ namespace GodmodeGames.Net.Transport.Udp
                             }
                             else
                             {
-                                this.Logger?.LogError("Invalid message received from " + endPoint.ToString() + "!");
+                                this.Logger?.GGLogError("Invalid message received from " + endPoint.ToString() + "!");
                             }
                         }
                     }
@@ -201,7 +201,7 @@ namespace GodmodeGames.Net.Transport.Udp
                                     if (kvp.Value.RetryTimes > this.SocketSettings.UdpResendTries)
                                     {
                                         this.PendingUnacknowledgedMessages.TryRemove(kvp.Key, out _);
-                                        this.Logger?.LogWarning("Number of max retries for packets resend reached! " + kvp.Value.MessageType);
+                                        this.Logger?.GGLogWarning("Number of max retries for packets resend reached! " + kvp.Value.MessageType);
                                         this.PacketLost(kvp.Value);
                                     }
                                     else
@@ -291,7 +291,7 @@ namespace GodmodeGames.Net.Transport.Udp
                 int packetlost = Math.Clamp(this.SocketSettings.SimulatedUdpPacketLostIncomming, 0, 100);
                 if (percent < packetlost)
                 {
-                    this.Logger?.LogWarning("Simulate receive packet-lost...");
+                    this.Logger?.GGLogWarning("Simulate receive packet-lost...");
                     return;
                 }
             }
@@ -360,7 +360,7 @@ namespace GodmodeGames.Net.Transport.Udp
                 int packetlost = Math.Clamp(this.SocketSettings.SimulatedUdpPacketLostOutgoing, 0, 100);
                 if (percent < packetlost)
                 {
-                    this.Logger?.LogWarning("Simulate send packet-lost...");
+                    this.Logger?.GGLogWarning("Simulate send packet-lost...");
 
                     if (msg.MessageType != EMessageType.Ack && msg.MessageId >= 0)
                     {
@@ -393,7 +393,7 @@ namespace GodmodeGames.Net.Transport.Udp
             }
             catch (Exception ex)
             {
-                this.Logger?.LogError("Error while serializing message: " + ex.Message);
+                this.Logger?.GGLogError("Error while serializing message: " + ex.Message);
                 return;
             }
 
@@ -404,13 +404,13 @@ namespace GodmodeGames.Net.Transport.Udp
             }
             catch (Exception ex)
             {
-                this.Logger?.LogError("Error while sending data to " + msg.RemoteEndpoint.ToString() + ": " + ex.Message);
+                this.Logger?.GGLogError("Error while sending data to " + msg.RemoteEndpoint.ToString() + ": " + ex.Message);
                 return;
             }
 
             if (numOfSentBytes == 0)
             {
-                this.Logger?.LogWarning("Sent empty message.");
+                this.Logger?.GGLogWarning("Sent empty message.");
             }
             else
             {

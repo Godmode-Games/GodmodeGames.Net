@@ -95,7 +95,7 @@ namespace GodmodeGames.Net.Transport.Udp
         {
             if (endpoint == null)
             {
-                this.Logger?.LogError("No server endpoint defined!");
+                this.Logger?.GGLogError("No server endpoint defined!");
                 return false;
             }
             this.ConnectAsync(endpoint);
@@ -131,12 +131,12 @@ namespace GodmodeGames.Net.Transport.Udp
         {
             if (data.Length == 0)
             {
-                this.Logger?.LogWarning("Tried to send empty message.");
+                this.Logger?.GGLogWarning("Tried to send empty message.");
                 return;
             }
             else if (this.RemoteEndpoint == null)
             {
-                this.Logger?.LogError("Could not send message to undefined endpoint!");
+                this.Logger?.GGLogError("Could not send message to undefined endpoint!");
                 return;
             }
 
@@ -320,7 +320,7 @@ namespace GodmodeGames.Net.Transport.Udp
         {
             if (this.ReceivedMessagesBuffer.Contains(msg.MessageId))
             {
-                this.Logger?.LogInfo("Skipping already received message.");
+                this.Logger?.GGLogError("Skipping already received message.");
                 return;
             }
             else

@@ -159,7 +159,7 @@ namespace GodmodeGames.Net.Transport.Udp
                         this.ClientDisconnected?.Invoke(kvp.Value, "timeout");
                         this.RemoveClient(kvp.Value);
                     }
-                    this.Logger?.LogInfo(timeout.Count + " connections timed out.");
+                    this.Logger?.GGLogError(timeout.Count + " connections timed out.");
                 }
 
                 //Remove old pending disconnects and force disconnect
@@ -194,13 +194,13 @@ namespace GodmodeGames.Net.Transport.Udp
         {
             if (connection == null || connection.ClientEndpoint == null)
             {
-                this.Logger?.LogWarning("Could not send message to undefined endpoint!");
+                this.Logger?.GGLogWarning("Could not send message to undefined endpoint!");
                 return;
             }
             
             if (data.Length == 0)
             {
-                this.Logger?.LogWarning("Tried to send empty message.");
+                this.Logger?.GGLogWarning("Tried to send empty message.");
                 return;
             }
 
@@ -318,14 +318,14 @@ namespace GodmodeGames.Net.Transport.Udp
             GGConnection client;
             if (!this.Connections.TryGetValue(msg.RemoteEndpoint, out client))
             {
-                this.Logger?.LogWarning("Skipping message from unknown receiver " + msg.RemoteEndpoint);
+                this.Logger?.GGLogWarning("Skipping message from unknown receiver " + msg.RemoteEndpoint);
                 return;
             }
 
             UdpConnection conn = client.Transport as UdpConnection;
             if (conn.ReceivedMessagesBuffer.Contains(msg.MessageId))
             {
-                //this.Logger?.LogInfo("Skipping already received message.");
+                //this.Logger?.GGLogError("Skipping already received message.");
                 return;
             }
             else

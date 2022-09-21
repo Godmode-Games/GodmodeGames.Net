@@ -2,10 +2,10 @@
 {
     public interface ILogger
     {
-        void LogInfo(string info);
+        void GGLogInfo(string info);
 
-        void LogWarning(string warning);
+        void GGLogWarning(string warning);
 
-        void LogError(string error);
+        void GGLogError(string error);
     }
 }

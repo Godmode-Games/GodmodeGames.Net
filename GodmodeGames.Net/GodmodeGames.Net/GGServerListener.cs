@@ -79,7 +79,7 @@ namespace GodmodeGames.Net
         /// <param name="endpoint"></param>
         public void StartListening(IPEndPoint endpoint)
         {
-            this.Logger?.LogInfo("Start listening on port " + endpoint.Port + " ...");
+            this.Logger?.GGLogError("Start listening on port " + endpoint.Port + " ...");
             this.Transport.Inititalize(this.Settings, this.Logger);
             this.Transport.StartListening(endpoint);
         }

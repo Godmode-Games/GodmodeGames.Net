@@ -56,7 +56,7 @@ namespace GodmodeGames.Net.Transport.Tcp
                     {
                         error += Environment.NewLine + "Inner exception: " + e.InnerException.Message;
                     }
-                    this.Server?.Logger?.LogError(error);
+                    this.Server?.Logger?.GGLogError(error);
 
                     this.mySSLStream.Close();
                     client.Close();
@@ -64,7 +64,7 @@ namespace GodmodeGames.Net.Transport.Tcp
                 }
                 catch (Exception e)
                 {
-                    this.Server?.Logger?.LogError("Error while BeginRead for " + this.Connection.ToString() + ": " + e.Message);
+                    this.Server?.Logger?.GGLogError("Error while BeginRead for " + this.Connection.ToString() + ": " + e.Message);
                     this.mySSLStream.Close();
                     client.Close();
                     return false;
@@ -234,7 +234,7 @@ namespace GodmodeGames.Net.Transport.Tcp
             }
             catch (AuthenticationException)
             {
-                this.Server?.Logger?.LogError("ssl authentication failed - closing the connection to client " + this.Connection.ToString());
+                this.Server?.Logger?.GGLogError("ssl authentication failed - closing the connection to client " + this.Connection.ToString());
                 this.Disconnect(false, "ssl-auth failed");
             }
             catch (IOException)
@@ -243,7 +243,7 @@ namespace GodmodeGames.Net.Transport.Tcp
             }
             catch (Exception ex)
             {
-                this.Server?.Logger?.LogError("error while receiving data from " + this.Connection.ToString() + ": " + ex.Message);
+                this.Server?.Logger?.GGLogError("error while receiving data from " + this.Connection.ToString() + ": " + ex.Message);
                 this.Disconnect(false, "error while receive data");
             }
         }

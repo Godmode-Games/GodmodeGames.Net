@@ -85,7 +85,7 @@ namespace GodmodeGames.Net.Transport.Tcp
             {
                 if (string.IsNullOrEmpty(this.SocketSettings.TcpSSLCert))
                 {
-                    this.Logger?.LogError("Trying to use tcp over ssl, but no certificate is defined!");
+                    this.Logger?.GGLogError("Trying to use tcp over ssl, but no certificate is defined!");
                     return;
                 }
             }
@@ -96,7 +96,7 @@ namespace GodmodeGames.Net.Transport.Tcp
             }            
             else if (this.SocketSettings.TcpSSL == true)
             {
-                this.Logger?.LogError("No ssl certificate location specified!");
+                this.Logger?.GGLogError("No ssl certificate location specified!");
                 return;
             }
             this.Socket = new TcpListener(this.ServerEndpoint);
@@ -231,7 +231,7 @@ namespace GodmodeGames.Net.Transport.Tcp
                     {
                         this.RemoveClient(kvp.Value, "timeout");
                     }
-                    this.Logger?.LogInfo(timeout.Count + " connections timed out.");
+                    this.Logger?.GGLogError(timeout.Count + " connections timed out.");
                 }
             }
         }

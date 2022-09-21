@@ -97,7 +97,7 @@ namespace GodmodeGames.Net.Transport.Tcp
         {
             if (endpoint == null)
             {
-                this.Logger?.LogError("No server endpoint defined!");
+                this.Logger?.GGLogError("No server endpoint defined!");
                 return false;
             }
 
@@ -126,7 +126,7 @@ namespace GodmodeGames.Net.Transport.Tcp
         {
             if (endpoint == null)
             {
-                this.Logger?.LogError("No server endpoint defined!");
+                this.Logger?.GGLogError("No server endpoint defined!");
                 return;
             }
 
@@ -148,7 +148,7 @@ namespace GodmodeGames.Net.Transport.Tcp
             }
             catch (Exception e)
             {
-                this.Logger?.LogError("Error while connecting to " + this.RemoteEndpoint.ToString() + ": " + e.Message);
+                this.Logger?.GGLogError("Error while connecting to " + this.RemoteEndpoint.ToString() + ": " + e.Message);
                 this.TickEvents.Enqueue(new TickEvent()
                 {
                     OnTick = () =>
@@ -376,7 +376,7 @@ namespace GodmodeGames.Net.Transport.Tcp
                             }
                             catch (AuthenticationException e)
                             {
-                                this.Logger?.LogError("ssl-authentication failed - closing the connection. " + e.Message);
+                                this.Logger?.GGLogError("ssl-authentication failed - closing the connection. " + e.Message);
                                 this.StopReceive();
                                 this.ConnectionStatus = EConnectionStatus.NotConnected;
                                 this.TickEvents.Enqueue(new TickEvent()
@@ -390,7 +390,7 @@ namespace GodmodeGames.Net.Transport.Tcp
                             }
                             catch (Exception e)
                             {
-                                this.Logger?.LogError("ssl-authentication exception - closing the connection. " + e.Message);
+                                this.Logger?.GGLogError("ssl-authentication exception - closing the connection. " + e.Message);
                                 this.StopReceive();
                                 this.ConnectionStatus = EConnectionStatus.NotConnected;
                                 this.TickEvents.Enqueue(new TickEvent()
@@ -424,7 +424,7 @@ namespace GodmodeGames.Net.Transport.Tcp
                     //10061 = Connection refused
                     if (socketexcepion.ErrorCode != 10061)
                     {
-                        this.Logger?.LogError("Failed to connect to server " + this.RemoteEndpoint.ToString() + ": " + socketexcepion.Message);
+                        this.Logger?.GGLogError("Failed to connect to server " + this.RemoteEndpoint.ToString() + ": " + socketexcepion.Message);
                     }
                     this.ConnectionStatus = EConnectionStatus.NotConnected;
                     this.StopReceive();
@@ -438,7 +438,7 @@ namespace GodmodeGames.Net.Transport.Tcp
                 }
                 catch (Exception ex)
                 {
-                    this.Logger?.LogError("Failed to connect to server " + this.RemoteEndpoint.ToString() + ": " + ex.Message);
+                    this.Logger?.GGLogError("Failed to connect to server " + this.RemoteEndpoint.ToString() + ": " + ex.Message);
                     this.ConnectionStatus = EConnectionStatus.NotConnected;
                     this.StopReceive();
                     this.TickEvents.Enqueue(new TickEvent()
@@ -537,7 +537,7 @@ namespace GodmodeGames.Net.Transport.Tcp
             }
             catch (Exception e)
             {
-                this.Logger?.LogError("OnReceive Error: " + e.Message);
+                this.Logger?.GGLogError("OnReceive Error: " + e.Message);
                 this.TickEvents.Enqueue(new TickEvent()
                 {
                     OnTick = () =>
@@ -801,7 +801,7 @@ namespace GodmodeGames.Net.Transport.Tcp
                 return true;
             }
 
-            this.Logger?.LogError("ssl certificate error: " + sslPolicyErrors.ToString());
+            this.Logger?.GGLogError("ssl certificate error: " + sslPolicyErrors.ToString());
             return false;
         }
         #endregion

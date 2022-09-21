@@ -102,7 +102,7 @@ namespace GodmodeGames.Net
             }
 
             this.ServerEndpoint = server;
-            this.Logger?.LogInfo("Connecting to " + this.ServerEndpoint.ToString() + " ...");
+            this.Logger?.GGLogError("Connecting to " + this.ServerEndpoint.ToString() + " ...");
             this.Transport.ConnectAttempt += this.OnTransportConnect;
             return this.Transport.Connect(server);
         }
@@ -140,7 +140,7 @@ namespace GodmodeGames.Net
             }
 
             this.ServerEndpoint = server;
-            this.Logger?.LogInfo("Connecting to " + this.ServerEndpoint.ToString() + " ...");
+            this.Logger?.GGLogError("Connecting to " + this.ServerEndpoint.ToString() + " ...");
             this.Transport.ConnectAttempt += this.OnTransportConnect;
             this.Transport.ConnectAsync(server);
         }
@@ -156,7 +156,7 @@ namespace GodmodeGames.Net
             {
                 return true;
             }
-            this.Logger?.LogInfo("Disconnecting from " + this.ServerEndpoint.ToString() + " ...");
+            this.Logger?.GGLogError("Disconnecting from " + this.ServerEndpoint.ToString() + " ...");
 
             return this.Transport.Disconnect(reason);
         }
@@ -172,7 +172,7 @@ namespace GodmodeGames.Net
                 this.Disconnected?.Invoke(EDisconnectBy.Client, reason);
                 return;
             }
-            this.Logger?.LogInfo("Disconnecting from " + this.ServerEndpoint.ToString() + " ...");
+            this.Logger?.GGLogError("Disconnecting from " + this.ServerEndpoint.ToString() + " ...");
 
             this.Transport.DisconnectAsync(reason);
         }
@@ -221,12 +221,12 @@ namespace GodmodeGames.Net
         {
             if (success)
             {
-                this.Logger?.LogInfo("Connection to " + this.ServerEndpoint.ToString() + " successful");
+                this.Logger?.GGLogError("Connection to " + this.ServerEndpoint.ToString() + " successful");
                 this.Transport.Disconnected += this.OnTransportDisconnect;
             }
             else
             {
-                this.Logger?.LogInfo("Connection to " + this.ServerEndpoint.ToString() + " failed");
+                this.Logger?.GGLogError("Connection to " + this.ServerEndpoint.ToString() + " failed");
             }
             this.Transport.ConnectAttempt -= this.OnTransportConnect;
             this.ConnectAttempt?.Invoke(success);
