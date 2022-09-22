@@ -6,6 +6,7 @@
     <IsPublishable>False</IsPublishable>
     <RootNamespace>GodmodeGames.Net</RootNamespace>
     <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
+    <FileVersion>2.0.0.1</FileVersion>
   </PropertyGroup>
 
 </Project>
